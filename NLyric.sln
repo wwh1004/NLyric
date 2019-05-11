@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28822.285
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLyric", "NLyric\NLyric.csproj", "{5423689E-6713-4F96-82E3-48B11E2A6412}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5423689E-6713-4F96-82E3-48B11E2A6412}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5423689E-6713-4F96-82E3-48B11E2A6412}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5423689E-6713-4F96-82E3-48B11E2A6412}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5423689E-6713-4F96-82E3-48B11E2A6412}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8F4FF140-407E-434C-8FEC-6736239F77A6}
+	EndGlobalSection
+EndGlobal
