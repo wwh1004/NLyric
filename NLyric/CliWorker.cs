@@ -86,10 +86,9 @@ namespace NLyric {
 			ncmTracks = await GetTracksAsync(ncmAlbum);
 			// 获取网易云音乐上专辑收录的歌曲
 			ncmTrack = MatchByUser(ncmTracks, track);
-			if (ncmTrack == null) {
-				Logger.Instance.LogInfo("歌曲匹配失败");
-				return null;
-			}
+			if (ncmTrack == null)
+				// 网易云音乐上的专辑可能没收录这个歌曲，不清楚为什么，但是确实存在这个情况，比如专辑id:3094396
+				return await MapToAsync(track);
 			Logger.Instance.LogInfo("歌曲匹配成功");
 			return ncmTrack;
 		}
