@@ -25,6 +25,10 @@ namespace NLyric {
 				extension = Path.GetExtension(filePath);
 				if (!Settings.Default.Search.AudioExtensions.Any(s => extension.Equals(s, StringComparison.OrdinalIgnoreCase)))
 					continue;
+				if (!arguments.Overwriting && File.Exists(Path.ChangeExtension(filePath, ".lrc"))) {
+					Logger.Instance.LogInfo($"文件\"{Path.GetFileName(filePath)}\"的歌词已存在，若要强制覆盖，请使用命令行参数--overwriting");
+					continue;
+				}
 				trackId = The163KeyHelper.TryGetMusicId(filePath);
 				if (trackId != null)
 					Logger.Instance.LogInfo($"已通过163Key获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId.Value.ToString()}");
@@ -290,17 +294,20 @@ namespace NLyric {
 			foreach (string mode in _lyricSettings.Modes) {
 				switch (mode.ToUpperInvariant()) {
 				case "MERGED":
-					if (rawLrc != null && translatedLrc != null)
-						return LrcMerger.Merge(rawLrc, translatedLrc);
-					break;
+					if (rawLrc == null || translatedLrc == null)
+						continue;
+					Logger.Instance.LogInfo("已获取混合歌词");
+					return LrcMerger.Merge(rawLrc, translatedLrc);
 				case "RAW":
-					if (rawLrc != null)
-						return rawLrc;
-					break;
+					if (rawLrc == null)
+						continue;
+					Logger.Instance.LogInfo("已获取原始歌词");
+					return rawLrc;
 				case "TRANSLATED":
-					if (translatedLrc != null)
-						return translatedLrc;
-					break;
+					if (translatedLrc == null)
+						continue;
+					Logger.Instance.LogInfo("已获取翻译歌词");
+					return translatedLrc;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(mode));
 				}

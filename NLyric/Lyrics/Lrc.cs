@@ -158,7 +158,7 @@ namespace NLyric.Lyrics {
 			return true;
 
 			string GetMetadata(string _line, string _key) {
-				return _line.Substring(_key.Length, _line.Length - _key.Length - 1);
+				return _line.Substring(_key.Length, _line.Length - _key.Length);
 			}
 		}
 
