@@ -280,6 +280,8 @@ namespace NLyric {
 				x = x.Fuzzy();
 				y = y.Fuzzy();
 			}
+			x = x.Trim();
+			y = y.Trim();
 			return Levenshtein.Compute(x, y);
 		}
 
