@@ -77,7 +77,17 @@ namespace NLyric {
 			if (value == null)
 				throw new ArgumentNullException(nameof(value));
 
-			return RemoveFeat(RemoveCover(value));
+			int fuzzyStartIndex;
+
+			fuzzyStartIndex = -1;
+			while ((fuzzyStartIndex = value.IndexOfAny(_fuzzySettings.ExtraInfoStart, fuzzyStartIndex + 1)) != -1) {
+				string extraInfo;
+
+				extraInfo = value.Substring(fuzzyStartIndex + 1);
+				if (Enumerable.Concat(_fuzzySettings.Covers, _fuzzySettings.Featurings).Any(s => extraInfo.StartsWith(s, StringComparison.OrdinalIgnoreCase)))
+					return value.Substring(0, fuzzyStartIndex).TrimEnd();
+			}
+			return value;
 		}
 
 		/// <summary>
@@ -92,26 +102,25 @@ namespace NLyric {
 			return value.Split(_searchSettings.Separators, StringSplitOptions.RemoveEmptyEntries);
 		}
 
-		private static string RemoveCover(string value) {
-			int index;
-			string right;
+		/// <summary>
+		/// 全角字符转半角字符
+		/// </summary>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static string ToHalfWidth(this string value) {
+			if (value == null)
+				throw new ArgumentNullException(nameof(value));
 
-			index = value.IndexOfAny(_fuzzySettings.OpenBrackets);
-			if (index == -1)
-				return value;
-			right = value.Substring(index + 1);
-			if (_fuzzySettings.Covers.Any(s => right.StartsWith(s, StringComparison.OrdinalIgnoreCase)))
-				value = value.Substring(0, index).TrimEnd();
-			return value;
-		}
+			char[] chars;
 
-		private static string RemoveFeat(string value) {
-			int index;
-
-			index = value.IndexOf("feat.", StringComparison.OrdinalIgnoreCase);
-			if (index != -1)
-				value = value.Substring(0, index).TrimEnd();
-			return value;
+			chars = value.ToCharArray();
+			for (int i = 0; i < chars.Length; i++) {
+				if (chars[i] == '\u3000')
+					chars[i] = '\u0020';
+				else if (chars[i] > '\uFF00' && chars[i] < '\uFF5F')
+					chars[i] = (char)(chars[i] - 0xFEE0);
+			}
+			return new string(chars);
 		}
 	}
 }

@@ -4,10 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using NLyric.AudioInfo;
+using NLyric.Lyrics;
 
 namespace NLyric.Ncm {
 	internal static class CloudMusic {
-		public static async Task<IEnumerable<NcmTrack>> SearchTrackAsync(Track track, bool withArtists) {
+		public static async Task<NcmTrack[]> SearchTrackAsync(Track track, bool withArtists) {
 			List<string> keywords;
 			JToken json;
 
@@ -21,10 +22,10 @@ namespace NLyric.Ncm {
 			for (int i = 0; i < keywords.Count; i++)
 				keywords[i] = keywords[i].WholeWordReplace();
 			json = await NcmApi.SearchAsync(keywords, NcmApi.SearchType.Track);
-			return ((JArray)json["songs"]).Select(t => ParseTrack(t, false));
+			return ((JArray)json["songs"]).Select(t => ParseTrack(t, false)).ToArray();
 		}
 
-		public static async Task<IEnumerable<NcmAlbum>> SearchAlbumAsync(Album album, bool withArtists) {
+		public static async Task<NcmAlbum[]> SearchAlbumAsync(Album album, bool withArtists) {
 			List<string> keywords;
 			JToken json;
 
@@ -38,14 +39,41 @@ namespace NLyric.Ncm {
 			for (int i = 0; i < keywords.Count; i++)
 				keywords[i] = keywords[i].WholeWordReplace();
 			json = await NcmApi.SearchAsync(keywords, NcmApi.SearchType.Album);
-			return ((JArray)json["albums"]).Select(t => ParseAlbum(t));
+			return ((JArray)json["albums"]).Select(t => ParseAlbum(t)).ToArray();
 		}
 
-		public static async Task<IEnumerable<NcmTrack>> GetTracksAsync(NcmAlbum ncmAlbum) {
+		public static async Task<NcmTrack[]> GetTracksAsync(int albumId) {
 			JToken json;
 
-			json = await NcmApi.GetAlbumAsync(ncmAlbum.Id);
-			return ((JArray)json["songs"]).Select(t => ParseTrack(t, true));
+			json = await NcmApi.GetAlbumAsync(albumId);
+			return ((JArray)json["songs"]).Select(t => ParseTrack(t, true)).ToArray();
+		}
+
+		public static async Task<(bool, Lrc, Lrc)> GetLyricAsync(int trackId) {
+			bool hasLyric;
+			JToken json;
+			JToken lrc;
+			string lyric;
+			Lrc rawLrc;
+			JToken tlyric;
+			Lrc translatedLrc;
+
+			(hasLyric, json) = await NcmApi.GetLyricAsync(trackId);
+			if (!hasLyric)
+				// 未收录
+				return (false, null, null);
+			if (json == null)
+				// 纯音乐
+				return (true, null, null);
+			lrc = json["lrc"];
+			lyric = (string)lrc["lyric"];
+			rawLrc = string.IsNullOrEmpty(lyric) ? null : Lrc.UnsafeParse(lyric);
+			// 未翻译歌词
+			tlyric = json["tlyric"];
+			lyric = (string)tlyric["lyric"];
+			translatedLrc = string.IsNullOrEmpty(lyric) ? null : Lrc.UnsafeParse(lyric);
+			// 翻译歌词
+			return (true, rawLrc, translatedLrc);
 		}
 
 		private static NcmAlbum ParseAlbum(JToken json) {

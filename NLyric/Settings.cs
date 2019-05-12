@@ -26,6 +26,8 @@ namespace NLyric {
 		public FuzzySettings Fuzzy { get; set; }
 
 		public MatchSettings Match { get; set; }
+
+		public LyricSettings Lyric { get; set; }
 	}
 
 	internal sealed class SearchSettings {
@@ -38,16 +40,16 @@ namespace NLyric {
 	}
 
 	internal sealed class FuzzySettings {
-		public bool IsEnabled { get; set; }
+		public bool TryIgnoringArtists { get; set; }
 
 		public bool TryIgnoringExtraInfo { get; set; }
 
-		public bool TryIgnoringArtists { get; set; }
-
 		[JsonConverter(typeof(CharArrayJsonConverter))]
-		public char[] OpenBrackets { get; set; }
+		public char[] ExtraInfoStart { get; set; }
 
 		public string[] Covers { get; set; }
+
+		public string[] Featurings { get; set; }
 	}
 
 	internal sealed class MatchSettings {
@@ -64,6 +66,10 @@ namespace NLyric {
 		}
 
 		public Dictionary<char, char> CharReplace { get; set; }
+	}
+
+	internal sealed class LyricSettings {
+		public string[] Modes { get; set; }
 	}
 
 	internal sealed class CharArrayJsonConverter : JsonConverter<char[]> {

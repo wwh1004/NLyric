@@ -1,0 +1,16 @@
+version: '{build}'
+image: Visual Studio 2019 Preview
+configuration: Release
+platform: Any CPU
+before_build:
+- cmd: appveyor-retry nuget restore
+build:
+  project: NLyric.sln
+  verbosity: normal
+after_build:
+- cmd: dotnet publish NLyric.sln -c Release -f netcoreapp2.1
+artifacts:
+- path: NLyric\bin\Release\net472
+  name: NLyric-net472
+- path: NLyric\bin\Release\netcoreapp2.1\publish
+  name: NLyric-netcoreapp2.1

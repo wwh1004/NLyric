@@ -11,6 +11,7 @@ namespace NLyric.Ncm {
 	internal static class NcmApi {
 		private const string SEARCH_URL = "http://musicapi.leanapp.cn/search";
 		private const string ALBUM_URL = "http://musicapi.leanapp.cn/album";
+		private const string LYRIC_URL = "http://music.163.com/api/song/lyric";
 
 		/// <summary>
 		/// 搜索类型
@@ -55,6 +56,29 @@ namespace NLyric.Ncm {
 				if ((int)json["code"] != 200)
 					throw new HttpRequestException();
 				return json;
+			}
+		}
+
+		public static async Task<(bool, JToken)> GetLyricAsync(int id) {
+			FormUrlEncodedCollection parameters;
+
+			parameters = new FormUrlEncodedCollection {
+				{ "id", id.ToString() },
+				{ "lv", "-1" },
+				{ "tv", "-1" }
+			};
+			using (HttpClient client = new HttpClient())
+			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, LYRIC_URL, parameters, null)) {
+				JObject json;
+
+				json = JObject.Parse(await response.Content.ReadAsStringAsync());
+				if ((int)json["code"] != 200)
+					throw new HttpRequestException();
+				if (json["uncollected"] != null)
+					return (false, null);
+				if (json["nolyric"] != null)
+					return (true, null);
+				return (true, json);
 			}
 		}
 	}
