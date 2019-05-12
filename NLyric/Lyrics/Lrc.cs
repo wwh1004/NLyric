@@ -154,7 +154,7 @@ namespace NLyric.Lyrics {
 				return true;
 			lyric = line.Substring(endIndex + 1).Trim();
 			foreach (TimeSpan time in times)
-				lrc._lyrics.Add(time, lyric);
+				lrc._lyrics[time] = lyric;
 			return true;
 
 			string GetMetadata(string _line, string _key) {

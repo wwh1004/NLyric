@@ -29,9 +29,10 @@ namespace NLyric {
 					Logger.Instance.LogInfo($"文件\"{Path.GetFileName(filePath)}\"的歌词已存在，若要强制覆盖，请使用命令行参数--overwriting");
 					continue;
 				}
+				Logger.Instance.LogInfo($"开始搜索文件\"{Path.GetFileName(filePath)}\"的歌词");
 				trackId = The163KeyHelper.TryGetMusicId(filePath);
 				if (trackId != null)
-					Logger.Instance.LogInfo($"已通过163Key获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId.Value.ToString()}");
+					Logger.Instance.LogInfo($"已通过163Key获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId}");
 				if (trackId == null) {
 					ATL.Track atlTrack;
 					Album album;
@@ -45,7 +46,7 @@ namespace NLyric {
 						ncmTrack = await MapToAsync(track, album);
 						if (ncmTrack != null) {
 							trackId = ncmTrack.Id;
-							Logger.Instance.LogInfo($"已通过匹配获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId.Value.ToString()}");
+							Logger.Instance.LogInfo($"已通过匹配获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId}");
 						}
 					}
 					catch (Exception ex) {
@@ -109,9 +110,12 @@ namespace NLyric {
 
 			NcmTrack ncmTrack;
 
+			Logger.Instance.LogInfo($"开始搜索歌曲\"{track}\"");
 			ncmTrack = await MapToAsync(track, true);
-			if (ncmTrack == null && _fuzzySettings.TryIgnoringArtists)
+			if (ncmTrack == null && _fuzzySettings.TryIgnoringArtists) {
+				Logger.Instance.LogWarning("正在尝试忽略艺术家搜索，结果可能将不精确");
 				ncmTrack = await MapToAsync(track, false);
+			}
 			if (ncmTrack == null) {
 				Logger.Instance.LogInfo("歌曲匹配失败");
 				return null;
@@ -140,12 +144,15 @@ namespace NLyric {
 			(hasValue, ncmAlbum) = tuple;
 			if (hasValue)
 				return ncmAlbum;
+			Logger.Instance.LogInfo($"开始搜索专辑\"{album}\"");
 			ncmAlbum = await MapToAsync(album, true);
-			if (ncmAlbum == null && _fuzzySettings.TryIgnoringArtists)
+			if (ncmAlbum == null && _fuzzySettings.TryIgnoringArtists) {
+				Logger.Instance.LogWarning("正在尝试忽略艺术家搜索，结果可能将不精确");
 				ncmAlbum = await MapToAsync(album, false);
+			}
 			if (ncmAlbum == null) {
 				Logger.Instance.LogInfo("专辑匹配失败");
-				_cachedNcmAlbums[replacedAlbumName] = (false, null);
+				_cachedNcmAlbums[replacedAlbumName] = (true, null);
 				return null;
 			}
 			Logger.Instance.LogInfo("专辑匹配成功");

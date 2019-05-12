@@ -22,6 +22,8 @@ namespace NLyric.Ncm {
 			for (int i = 0; i < keywords.Count; i++)
 				keywords[i] = keywords[i].WholeWordReplace();
 			json = await NcmApi.SearchAsync(keywords, NcmApi.SearchType.Track);
+			if ((int)json["songCount"] == 0)
+				return Array.Empty<NcmTrack>();
 			return ((JArray)json["songs"]).Select(t => ParseTrack(t, false)).ToArray();
 		}
 
@@ -39,6 +41,8 @@ namespace NLyric.Ncm {
 			for (int i = 0; i < keywords.Count; i++)
 				keywords[i] = keywords[i].WholeWordReplace();
 			json = await NcmApi.SearchAsync(keywords, NcmApi.SearchType.Album);
+			if ((int)json["albumCount"] == 0)
+				return Array.Empty<NcmAlbum>();
 			return ((JArray)json["albums"]).Select(t => ParseAlbum(t)).ToArray();
 		}
 
