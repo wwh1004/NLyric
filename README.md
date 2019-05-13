@@ -17,3 +17,7 @@
 GitHub: [Windows版](https://github.com/wwh1004/NLyric/releases/latest/download/NLyric-net472.zip)
 
 AppVeyor: [![Build status](https://ci.appveyor.com/api/projects/status/vu5vyq11cm38pd7r/branch/master?svg=true)](https://ci.appveyor.com/project/wwh1004/nlyric/branch/master)
+
+# 感谢
+
+混合歌词的思路参考了 [EHfive/Some-js-script-for-FB2](https://github.com/EHfive/Some-js-script-for-FB2K)

@@ -5,14 +5,17 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using NLyric.AudioInfo;
+using NLyric.Audio;
 using NLyric.Lyrics;
 using NLyric.Ncm;
+using NLyric.Settings;
 
 namespace NLyric {
 	internal static class CliWorker {
-		private static readonly FuzzySettings _fuzzySettings = Settings.Default.Fuzzy;
-		private static readonly LyricSettings _lyricSettings = Settings.Default.Lyric;
+		private static readonly SearchSettings _searchSettings = AllSettings.Default.Search;
+		private static readonly FuzzySettings _fuzzySettings = AllSettings.Default.Fuzzy;
+		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
+		private static readonly LyricSettings _lyricSettings = AllSettings.Default.Lyric;
 		private static readonly Dictionary<string, (bool, NcmAlbum)> _cachedNcmAlbums = new Dictionary<string, (bool, NcmAlbum)>();
 		private static readonly Dictionary<NcmAlbum, NcmTrack[]> _cachedNcmTrackses = new Dictionary<NcmAlbum, NcmTrack[]>();
 
@@ -23,7 +26,7 @@ namespace NLyric {
 				Lrc lrc;
 
 				extension = Path.GetExtension(filePath);
-				if (!Settings.Default.Search.AudioExtensions.Any(s => extension.Equals(s, StringComparison.OrdinalIgnoreCase)))
+				if (!_searchSettings.AudioExtensions.Any(s => extension.Equals(s, StringComparison.OrdinalIgnoreCase)))
 					continue;
 				if (!arguments.Overwriting && File.Exists(Path.ChangeExtension(filePath, ".lrc"))) {
 					Logger.Instance.LogInfo($"文件\"{Path.GetFileName(filePath)}\"的歌词已存在，若要强制覆盖，请使用命令行参数--overwriting");
@@ -60,7 +63,7 @@ namespace NLyric {
 				}
 				lrc = null;
 				try {
-					lrc = await GetLrcAsync(trackId.Value);
+					lrc = await GetLyricAsync(trackId.Value);
 				}
 				catch (Exception ex) {
 					Logger.Instance.LogException(ex);
@@ -126,7 +129,7 @@ namespace NLyric {
 		private static async Task<NcmTrack> MapToAsync(Track track, bool withArtists) {
 			NcmTrack[] ncmTracks;
 
-			ncmTracks = (await CloudMusic.SearchTrackAsync(track, withArtists)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
+			ncmTracks = (await CloudMusic.SearchTrackAsync(track, _searchSettings.Limit, withArtists)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
 			return MatchByUser(ncmTracks, track);
 		}
 
@@ -162,7 +165,7 @@ namespace NLyric {
 		private static async Task<NcmAlbum> MapToAsync(Album album, bool withArtists) {
 			NcmAlbum[] ncmAlbums;
 
-			ncmAlbums = (await CloudMusic.SearchAlbumAsync(album, withArtists)).Where(t => ComputeSimilarity(t.Name, album.Name, false) != 0).ToArray();
+			ncmAlbums = (await CloudMusic.SearchAlbumAsync(album, _searchSettings.Limit, withArtists)).Where(t => ComputeSimilarity(t.Name, album.Name, false) != 0).ToArray();
 			return MatchByUser(ncmAlbums, album);
 		}
 
@@ -194,7 +197,7 @@ namespace NLyric {
 				if (Confirm())
 					return result;
 			}
-			return fuzzy ? Select(sources.OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target) : null;
+			return fuzzy ? Select(sources.OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities) : null;
 			// fuzzy为true时是第二次搜索了，再让用户再次手动从搜索结果中选择，自动匹配失败的原因可能是 Settings.Match.MinimumSimilarity 设置太大了
 		}
 
@@ -203,11 +206,11 @@ namespace NLyric {
 				double nameSimilarity;
 
 				nameSimilarity = nameSimilarities[source];
-				if (nameSimilarity < Settings.Default.Match.MinimumSimilarity)
+				if (nameSimilarity < _matchSettings.MinimumSimilarity)
 					continue;
 				foreach (string ncmArtist in source.Artists)
 					foreach (string artist in target.Artists)
-						if (ComputeSimilarity(ncmArtist, artist, false) >= Settings.Default.Match.MinimumSimilarity) {
+						if (ComputeSimilarity(ncmArtist, artist, false) >= _matchSettings.MinimumSimilarity) {
 							Logger.Instance.LogInfo(
 								"自动匹配结果：" + Environment.NewLine +
 								"网易云音乐：" + source.ToString() + Environment.NewLine +
@@ -238,13 +241,13 @@ namespace NLyric {
 			} while (true);
 		}
 
-		private static TSource Select<TSource, TTarget>(TSource[] sources, TTarget target) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
+		private static TSource Select<TSource, TTarget>(TSource[] sources, TTarget target, Dictionary<TSource, double> nameSimilarities) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
 			TSource result;
 
 			Logger.Instance.LogInfo("请手动输入1,2,3...选择匹配的项，若不存在，请输入Pass");
 			Logger.Instance.LogInfo("对比项：" + TrackOrAlbumToString(target));
 			for (int i = 0; i < sources.Length; i++)
-				Logger.Instance.LogInfo((i + 1).ToString() + ". " + sources[i].ToString());
+				Logger.Instance.LogInfo(". " + $"{i + 1}. {sources[i]} (s:{nameSimilarities[sources[i]]})");
 			result = null;
 			do {
 				string userInput;
@@ -285,43 +288,77 @@ namespace NLyric {
 			return Levenshtein.Compute(x, y);
 		}
 
-		private static async Task<Lrc> GetLrcAsync(int trackId) {
-			bool hasLyric;
-			Lrc rawLrc;
-			Lrc translatedLrc;
+		#region lyrics
+		private static async Task<Lrc> GetLyricAsync(int trackId) {
+			NcmLyric lyric;
 
-			(hasLyric, rawLrc, translatedLrc) = await CloudMusic.GetLyricAsync(trackId);
-			if (!hasLyric) {
+			lyric = await CloudMusic.GetLyricAsync(trackId);
+			if (!lyric.IsCollected) {
 				Logger.Instance.LogInfo("当前歌曲的歌词未被收录");
 				return null;
 			}
-			if (rawLrc == null && translatedLrc == null) {
+			if (lyric.IsAbsoluteMusic) {
 				Logger.Instance.LogInfo("当前歌曲是纯音乐无歌词");
 				return null;
 			}
 			foreach (string mode in _lyricSettings.Modes) {
 				switch (mode.ToUpperInvariant()) {
 				case "MERGED":
-					if (rawLrc == null || translatedLrc == null)
+					if (lyric.Raw == null || lyric.Translated == null)
 						continue;
 					Logger.Instance.LogInfo("已获取混合歌词");
-					return LrcMerger.Merge(rawLrc, translatedLrc);
+					return MergeLyric(lyric.Raw, lyric.Translated);
 				case "RAW":
-					if (rawLrc == null)
+					if (lyric.Raw == null)
 						continue;
 					Logger.Instance.LogInfo("已获取原始歌词");
-					return rawLrc;
+					return lyric.Raw;
 				case "TRANSLATED":
-					if (translatedLrc == null)
+					if (lyric.Translated == null)
 						continue;
 					Logger.Instance.LogInfo("已获取翻译歌词");
-					return translatedLrc;
+					return lyric.Translated;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(mode));
 				}
 			}
 			return null;
 		}
+
+		private static Lrc MergeLyric(Lrc rawLrc, Lrc translatedLrc) {
+			if (rawLrc == null)
+				throw new ArgumentNullException(nameof(rawLrc));
+			if (translatedLrc == null)
+				throw new ArgumentNullException(nameof(translatedLrc));
+
+			Lrc mergedLrc;
+
+			mergedLrc = new Lrc {
+				Offset = rawLrc.Offset,
+				Title = rawLrc.Title
+			};
+			foreach (KeyValuePair<TimeSpan, string> rawLyric in rawLrc.Lyrics)
+				mergedLrc.Lyrics.Add(rawLyric.Key, rawLyric.Value);
+			foreach (KeyValuePair<TimeSpan, string> translatedLyric in translatedLrc.Lyrics) {
+				string rawLyric;
+
+				if (translatedLyric.Value.Length == 0)
+					// 如果翻译歌词是空字符串，跳过
+					continue;
+				if (!mergedLrc.Lyrics.ContainsKey(translatedLyric.Key)) {
+					// 如果没有对应的未翻译字符串，直接添加
+					mergedLrc.Lyrics.Add(translatedLyric.Key, translatedLyric.Value);
+					continue;
+				}
+				rawLyric = mergedLrc.Lyrics[translatedLyric.Key];
+				if (rawLyric.Length == 0)
+					// 如果未翻译歌词是空字符串，表示上一句歌词的结束，那么跳过
+					continue;
+				mergedLrc.Lyrics[translatedLyric.Key] = $"{rawLyric} 「{translatedLyric.Value}」";
+			}
+			return mergedLrc;
+		}
+		#endregion
 
 		private sealed class DictionaryComparer<TKey, TValue> : IComparer<TKey> where TValue : IComparable<TValue> {
 			private readonly Dictionary<TKey, TValue> _dictionary;
@@ -335,100 +372,6 @@ namespace NLyric {
 
 			public int Compare(TKey x, TKey y) {
 				return _dictionary[x].CompareTo(_dictionary[y]);
-			}
-		}
-
-		private static class The163KeyHelper {
-			private static readonly byte[] _163Start = Encoding.UTF8.GetBytes("163 key(Don't modify):");
-			private static readonly byte[] _163EndMp3 = { 0x54, 0x41, 0x4C, 0x42 };
-			private static readonly byte[] _163EndFlac = { 0x0, 0x0, 0x0, 0x45 };
-			private static readonly Aes _aes;
-
-			static The163KeyHelper() {
-				_aes = Aes.Create();
-				_aes.BlockSize = 128;
-				_aes.Key = Encoding.UTF8.GetBytes(@"#14ljk_!\]&0U<'(");
-				_aes.Mode = CipherMode.ECB;
-				_aes.Padding = PaddingMode.PKCS7;
-			}
-
-			public static int? TryGetMusicId(string filePath) {
-				string extension;
-				byte[] byt163Key;
-
-				extension = Path.GetExtension(filePath);
-				switch (extension.ToUpperInvariant()) {
-				case ".FLAC":
-					byt163Key = Get163Key(filePath, false);
-					break;
-				case ".MP3":
-					byt163Key = Get163Key(filePath, true);
-					break;
-				default:
-					byt163Key = null;
-					break;
-				}
-				if (byt163Key == null)
-					return null;
-				return GetMusicId(byt163Key);
-			}
-
-			public static byte[] Get163Key(string filePath, bool isMp3) {
-				byte[] bytFile;
-				int startIndex;
-				int endIndex;
-				byte[] byt163Key;
-
-				bytFile = new byte[0x4000];
-				using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-					stream.Read(bytFile, 0, bytFile.Length);
-				startIndex = GetIndex(bytFile, _163Start, 0);
-				if (startIndex == -1)
-					return null;
-				if (isMp3)
-					endIndex = GetIndex(bytFile, _163EndMp3, startIndex);
-				else
-					endIndex = GetIndex(bytFile, _163EndFlac, startIndex) - 1;
-				if (endIndex == -1)
-					return null;
-				byt163Key = new byte[endIndex - startIndex - _163Start.Length];
-				Buffer.BlockCopy(bytFile, startIndex + _163Start.Length, byt163Key, 0, byt163Key.Length);
-				return byt163Key;
-			}
-
-			public static int GetMusicId(byte[] byt163Key) {
-				byt163Key = Convert.FromBase64String(Encoding.UTF8.GetString(byt163Key));
-				byt163Key = _aes.CreateDecryptor().TransformFinalBlock(byt163Key, 0, byt163Key.Length);
-				return int.Parse(Encoding.UTF8.GetString(byt163Key, 17, GetIndex(byt163Key, 0x2C, 17) - 17));
-			}
-
-			private static int GetIndex(byte[] src, byte dest, int startIndex) {
-				return GetIndex(src, dest, startIndex, src.Length - 1);
-			}
-
-			private static int GetIndex(byte[] src, byte dest, int startIndex, int endIndex) {
-				for (int i = startIndex; i < endIndex + 1; i++)
-					if (src[i] == dest)
-						return i;
-				return -1;
-			}
-
-			private static int GetIndex(byte[] src, byte[] dest, int startIndex) {
-				return GetIndex(src, dest, startIndex, src.Length - dest.Length);
-			}
-
-			private static int GetIndex(byte[] src, byte[] dest, int startIndex, int endIndex) {
-				int j;
-
-				for (int i = startIndex; i < endIndex + 1; i++)
-					if (src[i] == dest[0]) {
-						for (j = 1; j < dest.Length; j++)
-							if (src[i + j] != dest[j])
-								break;
-						if (j == dest.Length)
-							return i;
-					}
-				return -1;
 			}
 		}
 	}

@@ -1,7 +1,7 @@
-using NLyric.AudioInfo;
+using NLyric.Audio;
 
 namespace NLyric.Ncm {
-	internal sealed class NcmTrack : Track {
+	public sealed class NcmTrack : Track {
 		private readonly int _id;
 
 		public int Id => _id;

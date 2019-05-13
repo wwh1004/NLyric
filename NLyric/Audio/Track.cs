@@ -1,7 +1,7 @@
 using System;
 
-namespace NLyric.AudioInfo {
-	internal class Track : ITrackOrAlbum {
+namespace NLyric.Audio {
+	public class Track : ITrackOrAlbum {
 		private readonly string _name;
 		private readonly string[] _artists;
 

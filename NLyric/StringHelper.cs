@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using NLyric.Settings;
 
 namespace NLyric {
 	internal static class StringHelper {
-		private static readonly SearchSettings _searchSettings = Settings.Default.Search;
-		private static readonly FuzzySettings _fuzzySettings = Settings.Default.Fuzzy;
-		private static readonly MatchSettings _matchSettings = Settings.Default.Match;
+		private static readonly SearchSettings _searchSettings = AllSettings.Default.Search;
+		private static readonly FuzzySettings _fuzzySettings = AllSettings.Default.Fuzzy;
+		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
 
 		/// <summary>
 		/// 获取非空字符串，并且清楚首尾空格

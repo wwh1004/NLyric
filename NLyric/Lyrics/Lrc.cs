@@ -2,16 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace NLyric.Lyrics {
-	internal sealed class Lrc {
+	public sealed class Lrc {
 		const string TI = "ti:";
 		const string AR = "ar:";
 		const string AL = "al:";
 		const string BY = "by:";
 		const string OFFSET = "offset:";
-		private static readonly Regex _lyricRegex = new Regex(@"\[([0-9.:]*)\]+(.*)");
 
 		private string _title;
 		private string _artist;

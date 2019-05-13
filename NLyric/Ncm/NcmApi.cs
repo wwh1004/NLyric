@@ -8,7 +8,7 @@ namespace NLyric.Ncm {
 	/// <summary>
 	/// 网易云音乐API，内容不完整，可根据 https://binaryify.github.io/NeteaseCloudMusicApi 自己添加
 	/// </summary>
-	internal static class NcmApi {
+	public static class NcmApi {
 		private const string SEARCH_URL = "http://musicapi.leanapp.cn/search";
 		private const string ALBUM_URL = "http://musicapi.leanapp.cn/album";
 		private const string LYRIC_URL = "http://music.163.com/api/song/lyric";
@@ -23,13 +23,13 @@ namespace NLyric.Ncm {
 			Playlist = 1000
 		}
 
-		public static async Task<JToken> SearchAsync(IEnumerable<string> keywords, SearchType type) {
+		public static async Task<JToken> SearchAsync(IEnumerable<string> keywords, SearchType type, int limit) {
 			FormUrlEncodedCollection parameters;
 
 			parameters = new FormUrlEncodedCollection {
 				{ "keywords", string.Join(" ", keywords) },
 				{ "type", ((int)type).ToString() },
-				{ "limit", "10" }
+				{ "limit", limit.ToString() }
 			};
 			using (HttpClient client = new HttpClient())
 			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, SEARCH_URL, parameters, null)) {
@@ -59,7 +59,7 @@ namespace NLyric.Ncm {
 			}
 		}
 
-		public static async Task<(bool, JToken)> GetLyricAsync(int id) {
+		public static async Task<JToken> GetLyricAsync(int id) {
 			FormUrlEncodedCollection parameters;
 
 			parameters = new FormUrlEncodedCollection {
@@ -74,11 +74,7 @@ namespace NLyric.Ncm {
 				json = JObject.Parse(await response.Content.ReadAsStringAsync());
 				if ((int)json["code"] != 200)
 					throw new HttpRequestException();
-				if (json["uncollected"] != null)
-					return (false, null);
-				if (json["nolyric"] != null)
-					return (true, null);
-				return (true, json);
+				return json;
 			}
 		}
 	}
