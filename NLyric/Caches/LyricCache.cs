@@ -1,3 +1,4 @@
+using System;
 using NLyric.Ncm;
 
 namespace NLyric.Caches {
@@ -10,17 +11,23 @@ namespace NLyric.Caches {
 
 		public int TranslatedVersion { get; set; }
 
+		public string CheckSum { get; set; }
+
 		public LyricCache() {
 		}
 
-		public LyricCache(NcmLyric lyric) : this(lyric.IsCollected, lyric.IsAbsoluteMusic, lyric.RawVersion, lyric.TranslatedVersion) {
+		public LyricCache(NcmLyric lyric, string checkSum) : this(lyric.IsCollected, lyric.IsAbsoluteMusic, lyric.RawVersion, lyric.TranslatedVersion, checkSum) {
 		}
 
-		public LyricCache(bool isCollected, bool isAbsoluteMusic, int rawVersion, int translatedVersion) {
+		public LyricCache(bool isCollected, bool isAbsoluteMusic, int rawVersion, int translatedVersion, string checkSum) {
+			if (checkSum == null)
+				throw new ArgumentNullException(nameof(checkSum));
+
 			IsCollected = isCollected;
 			IsAbsoluteMusic = isAbsoluteMusic;
 			RawVersion = rawVersion;
 			TranslatedVersion = translatedVersion;
+			CheckSum = checkSum;
 		}
 	}
 }

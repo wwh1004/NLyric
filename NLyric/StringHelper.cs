@@ -20,7 +20,7 @@ namespace NLyric {
 		}
 
 		/// <summary>
-		/// 同时调用 <see cref="WholeWordReplace(string)"/> 与 <see cref="CharReplace(string)"/>
+		/// 同时调用 <see cref="ToHalfWidth(string)"/>, <see cref="WholeWordReplace(string)"/> 与 <see cref="CharReplace(string)"/>
 		/// </summary>
 		/// <param name="value"></param>
 		/// <returns></returns>
@@ -28,7 +28,7 @@ namespace NLyric {
 			if (value == null)
 				throw new ArgumentNullException(nameof(value));
 
-			return value.WholeWordReplace().CharReplace();
+			return value.ToHalfWidth().WholeWordReplace().CharReplace();
 		}
 
 		/// <summary>
