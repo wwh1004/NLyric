@@ -17,7 +17,7 @@ namespace NLyric.Caches {
 		public TrackCache() {
 		}
 
-		public TrackCache(NcmTrack track, string albumName, NcmLyric lyric) : this(track.Name, string.Join(",", track.Artists.OrderBy(s => s)), track.Id, albumName, new LyricCache(lyric)) {
+		public TrackCache(NcmTrack track, string albumName, NcmLyric lyric, string checkSum) : this(track.Name, string.Join(",", track.Artists.OrderBy(s => s)), track.Id, albumName, new LyricCache(lyric, checkSum)) {
 		}
 
 		public TrackCache(string name, string artists, int id, string albumName, LyricCache lyric) {

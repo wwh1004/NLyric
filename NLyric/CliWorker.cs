@@ -15,12 +15,17 @@ namespace NLyric {
 		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
 		private static readonly LyricSettings _lyricSettings = AllSettings.Default.Lyric;
 		private static readonly Dictionary<string, NcmAlbum> _cachedNcmAlbums = new Dictionary<string, NcmAlbum>();
-		private static readonly Dictionary<NcmAlbum, NcmTrack[]> _cachedNcmTrackses = new Dictionary<NcmAlbum, NcmTrack[]>();
+		private static readonly Dictionary<int, NcmTrack[]> _cachedNcmTrackses = new Dictionary<int, NcmTrack[]>();
+		private static readonly Dictionary<int, NcmLyric> _cachedNcmLyrics = new Dictionary<int, NcmLyric>();
 
 		public static async Task ExecuteAsync(CliArguments arguments) {
 			foreach (string filePath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string extension;
+				ATL.Track atlTrack;
+				Track track;
+				Album album;
 				int? trackId;
+				NcmLyric ncmLyric;
 				Lrc lrc;
 
 				extension = Path.GetExtension(filePath);
@@ -31,23 +36,27 @@ namespace NLyric {
 					continue;
 				}
 				Logger.Instance.LogInfo($"开始搜索文件\"{Path.GetFileName(filePath)}\"的歌词。");
-				trackId = await TryGetMusicId(filePath);
+				atlTrack = new ATL.Track(filePath);
+				track = new Track(atlTrack);
+				album = Album.HasAlbumInfo(atlTrack) ? new Album(atlTrack, true) : null;
+				trackId = await TryGetMusicId(filePath, track, album);
+				// 同时尝试通过163Key和专辑获取歌曲信息
 				if (trackId == null) {
 					Logger.Instance.LogWarning($"无法找到文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID！");
 					Logger.Instance.LogNewLine();
 					Logger.Instance.LogNewLine();
 					continue;
 				}
+				ncmLyric = null;
 				lrc = null;
 				try {
-					lrc = await GetLyricAsync(trackId.Value);
+					(ncmLyric, lrc) = await GetLyricAsync(trackId.Value);
 				}
 				catch (Exception ex) {
 					Logger.Instance.LogException(ex);
+					continue;
 				}
-				while (lrc == null && Confirm("当前网易云音乐歌曲未收录歌词，是否使用其它版本的歌词？")) {
-
-				}
+				// 获取歌词
 				if (lrc != null)
 					File.WriteAllText(Path.ChangeExtension(filePath, ".lrc"), lrc.ToString());
 				Logger.Instance.LogNewLine();
@@ -55,52 +64,29 @@ namespace NLyric {
 			}
 		}
 
-		private static async Task<int?> TryGetMusicId(string filePath) {
+		private static async Task<int?> TryGetMusicId(string filePath, Track track, Album album) {
 			int? trackId;
+			NcmTrack ncmTrack;
 
 			trackId = The163KeyHelper.TryGetMusicId(filePath);
-			if (trackId != null)
+			if (trackId != null) {
 				// 歌曲有163Key，是网易云音乐上下载的
 				Logger.Instance.LogInfo($"已通过163Key获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId}。");
-			else {
+				return trackId;
+			}
+			trackId = null;
+			try {
 				// 歌曲无163Key，通过自己的算法匹配
-				ATL.Track atlTrack;
-				Album album;
-				Track track;
-				NcmTrack ncmTrack;
-
-				atlTrack = new ATL.Track(filePath);
-				album = Album.HasAlbumInfo(atlTrack) ? new Album(atlTrack, true) : null;
-				track = new Track(atlTrack);
-				try {
-					ncmTrack = await MapToAsync(track, album);
-					if (ncmTrack != null) {
-						trackId = ncmTrack.Id;
-						Logger.Instance.LogInfo($"已通过匹配获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId}。");
-					}
-				}
-				catch (Exception ex) {
-					Logger.Instance.LogException(ex);
+				ncmTrack = await MapToAsync(track, album);
+				if (ncmTrack != null) {
+					trackId = ncmTrack.Id;
+					Logger.Instance.LogInfo($"已通过匹配获取文件\"{Path.GetFileName(filePath)}\"的网易云音乐ID: {trackId}。");
 				}
 			}
+			catch (Exception ex) {
+				Logger.Instance.LogException(ex);
+			}
 			return trackId;
-		}
-
-		private static bool Confirm(string text) {
-			Logger.Instance.LogInfo(text);
-			Logger.Instance.LogInfo("请手动输入Yes或No。");
-			do {
-				string userInput;
-
-				userInput = Console.ReadLine().Trim().ToUpperInvariant();
-				switch (userInput) {
-				case "YES":
-					return true;
-				case "NO":
-					return false;
-				}
-				Logger.Instance.LogWarning("输入有误，请重新输入！");
-			} while (true);
 		}
 
 		#region mapping
@@ -126,9 +112,9 @@ namespace NLyric {
 				// 网易云音乐收录了歌曲所在专辑
 				NcmTrack[] ncmTracks;
 
-				if (!_cachedNcmTrackses.TryGetValue(ncmAlbum, out ncmTracks)) {
+				if (!_cachedNcmTrackses.TryGetValue(ncmAlbum.Id, out ncmTracks)) {
 					ncmTracks = (await CloudMusic.GetTracksAsync(ncmAlbum.Id)).ToArray();
-					_cachedNcmTrackses[ncmAlbum] = ncmTracks;
+					_cachedNcmTrackses[ncmAlbum.Id] = ncmTracks;
 				}
 				// 获取网易云音乐上专辑收录的歌曲
 				ncmTrack = MatchByUser(ncmTracks, track);
@@ -280,7 +266,7 @@ namespace NLyric {
 			Logger.Instance.LogInfo("请手动输入1,2,3...选择匹配的项，若不存在，请输入Pass。");
 			Logger.Instance.LogInfo("对比项：" + TrackOrAlbumToString(target));
 			for (int i = 0; i < sources.Length; i++)
-				Logger.Instance.LogInfo(". " + $"{i + 1}. {sources[i]} (s:{nameSimilarities[sources[i]]})");
+				Logger.Instance.LogInfo($"{i + 1}. {sources[i]} (s:{nameSimilarities[sources[i]]})");
 			result = null;
 			do {
 				string userInput;
@@ -309,6 +295,23 @@ namespace NLyric {
 			}
 		}
 
+		private static bool Confirm(string text) {
+			Logger.Instance.LogInfo(text);
+			Logger.Instance.LogInfo("请手动输入Yes或No。");
+			do {
+				string userInput;
+
+				userInput = Console.ReadLine().Trim().ToUpperInvariant();
+				switch (userInput) {
+				case "YES":
+					return true;
+				case "NO":
+					return false;
+				}
+				Logger.Instance.LogWarning("输入有误，请重新输入！");
+			} while (true);
+		}
+
 		private static double ComputeSimilarity(string x, string y, bool fuzzy) {
 			x = x.ReplaceEx();
 			y = y.ReplaceEx();
@@ -323,17 +326,17 @@ namespace NLyric {
 		#endregion
 
 		#region lyrics
-		private static async Task<Lrc> GetLyricAsync(int trackId) {
+		private static async Task<(NcmLyric, Lrc)> GetLyricAsync(int trackId) {
 			NcmLyric lyric;
 
 			lyric = await CloudMusic.GetLyricAsync(trackId);
 			if (!lyric.IsCollected) {
 				Logger.Instance.LogWarning("当前歌曲的歌词未被收录！");
-				return null;
+				return (lyric, null);
 			}
 			if (lyric.IsAbsoluteMusic) {
 				Logger.Instance.LogWarning("当前歌曲是纯音乐无歌词！");
-				return null;
+				return (lyric, null);
 			}
 			foreach (string mode in _lyricSettings.Modes) {
 				switch (mode.ToUpperInvariant()) {
@@ -341,22 +344,22 @@ namespace NLyric {
 					if (lyric.Raw == null || lyric.Translated == null)
 						continue;
 					Logger.Instance.LogInfo("已获取混合歌词。");
-					return MergeLyric(lyric.Raw, lyric.Translated);
+					return (lyric, MergeLyric(lyric.Raw, lyric.Translated));
 				case "RAW":
 					if (lyric.Raw == null)
 						continue;
 					Logger.Instance.LogInfo("已获取原始歌词。");
-					return lyric.Raw;
+					return (lyric, lyric.Raw);
 				case "TRANSLATED":
 					if (lyric.Translated == null)
 						continue;
 					Logger.Instance.LogInfo("已获取翻译歌词。");
-					return lyric.Translated;
+					return (lyric, lyric.Translated);
 				default:
 					throw new ArgumentOutOfRangeException(nameof(mode));
 				}
 			}
-			return null;
+			return (lyric, null);
 		}
 
 		private static Lrc MergeLyric(Lrc rawLrc, Lrc translatedLrc) {
