@@ -63,13 +63,13 @@ namespace NLyric.Ncm {
 			json = await NcmApi.GetLyricAsync(trackId);
 			if ((bool?)json["uncollected"] == true)
 				// 未收录
-				return new NcmLyric(false, false, null, 0, null, 0);
+				return new NcmLyric(trackId, false, false, null, 0, null, 0);
 			if ((bool?)json["nolyric"] == true)
 				// 纯音乐
-				return new NcmLyric(true, true, null, 0, null, 0);
+				return new NcmLyric(trackId, true, true, null, 0, null, 0);
 			(rawLrc, rawVersion) = ParseLyric(json["lrc"]);
 			(translatedLrc, translatedVersion) = ParseLyric(json["tlyric"]);
-			return new NcmLyric(true, false, rawLrc, rawVersion, translatedLrc, translatedVersion);
+			return new NcmLyric(trackId, true, false, rawLrc, rawVersion, translatedLrc, translatedVersion);
 		}
 
 		private static NcmAlbum ParseAlbum(JToken json) {

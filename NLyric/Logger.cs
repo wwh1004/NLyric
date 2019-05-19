@@ -18,31 +18,25 @@ namespace NLyric {
 
 		public void LogInfo(string value) {
 			lock (_syncRoot)
-				//Console.WriteLine($"[{DateTime.Now.ToString()}] {value}");
 				Console.WriteLine(value);
 		}
 
 		public void LogWarning(string value) {
-			lock (_syncRoot) {
-				ConsoleColor color;
-
-				color = Console.ForegroundColor;
-				Console.ForegroundColor = ConsoleColor.Yellow;
-				//Console.WriteLine($"[{DateTime.Now.ToString()}] {value}");
-				Console.WriteLine(value);
-				Console.ForegroundColor = color;
-			}
+			LogInfo(value, ConsoleColor.Yellow);
 		}
 
 		public void LogError(string value) {
-			lock (_syncRoot) {
-				ConsoleColor color;
+			LogInfo(value, ConsoleColor.Red);
+		}
 
-				color = Console.ForegroundColor;
-				Console.ForegroundColor = ConsoleColor.Red;
-				//Console.Error.WriteLine($"[{DateTime.Now.ToString()}] {value}");
-				Console.Error.WriteLine(value);
+		public void LogInfo(string value, ConsoleColor color) {
+			lock (_syncRoot) {
+				ConsoleColor oldColor;
+
+				oldColor = Console.ForegroundColor;
 				Console.ForegroundColor = color;
+				Console.WriteLine(value);
+				Console.ForegroundColor = oldColor;
 			}
 		}
 

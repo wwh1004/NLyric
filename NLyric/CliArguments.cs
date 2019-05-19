@@ -11,7 +11,8 @@ namespace NLyric {
 			set {
 				if (!System.IO.Directory.Exists(value))
 					throw new DirectoryNotFoundException();
-				_directory = value;
+
+				_directory = Path.GetFullPath(value);
 			}
 		}
 

@@ -1,30 +1,52 @@
 using System;
-using System.Linq;
-using NLyric.Ncm;
+using Newtonsoft.Json;
+using NLyric.Audio;
 
 namespace NLyric.Caches {
-	internal sealed class AlbumCache {
+	public sealed class AlbumCache : IEquatable<AlbumCache> {
 		public string Name { get; set; }
-
-		public string Artists { get; set; }
 
 		public int Id { get; set; }
 
+		[JsonConstructor]
+		[Obsolete("Deserialization only", true)]
 		public AlbumCache() {
 		}
 
-		public AlbumCache(NcmAlbum album) : this(album.Name, string.Join(",", album.Artists.OrderBy(s => s)), album.Id) {
+		public AlbumCache(Album album, int id) : this(album.Name, id) {
 		}
 
-		public AlbumCache(string name, string artists, int id) {
+		public AlbumCache(string name, int id) {
 			if (name == null)
 				throw new ArgumentNullException(nameof(name));
-			if (artists == null)
-				throw new ArgumentNullException(nameof(artists));
 
 			Name = name;
-			Artists = artists;
 			Id = id;
+		}
+
+		public static bool operator ==(AlbumCache x, AlbumCache y) {
+			if (x == null)
+				return x == null;
+			return x.Equals(y);
+		}
+
+		public static bool operator !=(AlbumCache x, AlbumCache y) {
+			return !(x == y);
+		}
+
+		public bool Equals(AlbumCache obj) {
+			return !(obj is null) && obj.Id == Id && obj.Name == Name;
+		}
+
+		public override bool Equals(object obj) {
+			AlbumCache cache;
+
+			cache = obj as AlbumCache;
+			return !(cache is null) && Equals(cache);
+		}
+
+		public override int GetHashCode() {
+			return Id.GetHashCode();
 		}
 	}
 }

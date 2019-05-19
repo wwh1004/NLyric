@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using NLyric.Audio;
+using NLyric.Caches;
 using NLyric.Lyrics;
 using NLyric.Ncm;
 using NLyric.Settings;
@@ -17,17 +19,21 @@ namespace NLyric {
 		private static readonly Dictionary<string, NcmAlbum> _cachedNcmAlbums = new Dictionary<string, NcmAlbum>();
 		private static readonly Dictionary<int, NcmTrack[]> _cachedNcmTrackses = new Dictionary<int, NcmTrack[]>();
 		private static readonly Dictionary<int, NcmLyric> _cachedNcmLyrics = new Dictionary<int, NcmLyric>();
+		private static AllCaches _allCaches;
 
 		public static async Task ExecuteAsync(CliArguments arguments) {
 			Logger.Instance.LogWarning("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！");
 			Logger.Instance.LogNewLine();
+			LoadLocalCaches(arguments.Directory);
+			await Task.Delay(0);
+			return;
 			foreach (string filePath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string extension;
 				int? trackId;
 				Lrc lrc;
 
 				extension = Path.GetExtension(filePath);
-				if (!_searchSettings.AudioExtensions.Any(s => extension.Equals(s, StringComparison.OrdinalIgnoreCase)))
+				if (!IsAudioFile(extension))
 					continue;
 				if (!arguments.Overwriting && File.Exists(Path.ChangeExtension(filePath, ".lrc"))) {
 					Logger.Instance.LogInfo($"文件\"{Path.GetFileName(filePath)}\"的歌词已存在。");
@@ -49,6 +55,10 @@ namespace NLyric {
 				Logger.Instance.LogNewLine();
 				Logger.Instance.LogNewLine();
 			}
+		}
+
+		private static bool IsAudioFile(string extension) {
+			return _searchSettings.AudioExtensions.Any(s => extension.Equals(s, StringComparison.OrdinalIgnoreCase));
 		}
 
 		private static async Task<int?> TryGetMusicId(string filePath) {
@@ -233,6 +243,72 @@ namespace NLyric {
 		}
 		#endregion
 
+		#region local cache
+		private static void LoadLocalCaches(string directoryPath) {
+			string cachePath;
+
+			cachePath = Path.Combine(directoryPath, ".nlyric");
+			if (File.Exists(cachePath)) {
+				AllCaches allCaches;
+				string[] filePaths;
+				Track[] tracks;
+				Album[] albums;
+
+				allCaches = JsonConvert.DeserializeObject<AllCaches>(File.ReadAllText(cachePath));
+					filePaths = Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories).Where(t => IsAudioFile(Path.GetExtension(t))).ToArray();
+				GetAudioInfos(filePaths, out tracks, out albums);
+				allCaches.AlbumCaches = allCaches.AlbumCaches.Where(t => albums.Any(x => t.IsMatched(x))).ToList();
+				allCaches.TrackCaches = allCaches.TrackCaches.Where(t => Enumerable.Range(0, tracks.Length).Any(i => t.IsMatched(tracks[i], albums[i]))).ToList();
+				allCaches.LyricCaches = allCaches.LyricCaches.Where(t => allCaches.TrackCaches.Any(x => t.IsMatched(x.Id))).ToList();
+				// 清理无效缓存，算法非常低效，但是不想改了，简洁就行，这里并不是整个程序性能瓶颈，网络请求占用时间远比这个多
+				Logger.Instance.LogInfo($"搜索缓存\"{cachePath}\"已被加载。");
+			}
+			else
+				_allCaches = new AllCaches() {
+					AlbumCaches = new List<AlbumCache>(),
+					LyricCaches = new List<LyricCache>(),
+					TrackCaches = new List<TrackCache>()
+				};
+		}
+
+		private static void GetAudioInfos(IEnumerable<string> filePaths, out Track[] tracks, out Album[] albums) {
+			IEnumerable<(Track, Album)> infos;
+
+			infos = filePaths.Select(filePath => {
+				ATL.Track atlTrack;
+
+				atlTrack = new ATL.Track(filePath);
+				return (new Track(atlTrack), new Album(atlTrack, true));
+			});
+			tracks = infos.Select(t => t.Item1).ToArray();
+			albums = infos.Select(t => t.Item2).ToArray();
+		}
+
+		private static void AddCache(Album album, int id) {
+			AlbumCache cache;
+
+			cache = _allCaches.AlbumCaches.Match(album);
+			if (cache is null)
+				_allCaches.AlbumCaches.Add(new AlbumCache(album, id));
+		}
+
+		private static void AddCache(Track track,Album album, int id) {
+			TrackCache cache;
+
+			cache = _allCaches.TrackCaches.Match(track, album);
+			if (cache is null)
+				_allCaches.TrackCaches.Add(new TrackCache(track, album, id));
+		}
+
+		private static void AddCache(NcmLyric lyric, string checkSum) {
+			LyricCache cache;
+
+			cache = _allCaches.LyricCaches.Match(lyric.Id);
+			if (cache is null)
+				_allCaches.LyricCaches.Add(new LyricCache(lyric, checkSum));
+		}
+		#endregion
+
 		#region match
 		private static TSource MatchByUser<TSource, TTarget>(TSource[] sources, TTarget target) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
 			TSource result;
@@ -298,11 +374,11 @@ namespace NLyric {
 				nameSimilarity = nameSimilarities[sources[i]];
 				text = $"{i + 1}. {sources[i]} (s:{nameSimilarity.ToString("F2")})";
 				if (nameSimilarity >= 0.85)
-					Logger.Instance.LogInfo(text);
+					Logger.Instance.LogInfo(text, ConsoleColor.Green);
 				else if (nameSimilarity >= 0.5)
-					Logger.Instance.LogWarning(text);
+					Logger.Instance.LogInfo(text, ConsoleColor.Yellow);
 				else
-					Logger.Instance.LogError(text);
+					Logger.Instance.LogInfo(text);
 			}
 			result = null;
 			do {
