@@ -15,66 +15,68 @@ namespace System.Cli {
 		}
 
 		public static bool TryParse<T>(string[] args, out T result) where T : new() {
-			if (args == null)
-				throw new ArgumentNullException(nameof(args));
+			if (args == null) {
+				result = default;
+				return false;
+			}
 
-			Dictionary<string, CliArgumentInfo> cliArgumentInfoDictionary;
+			Dictionary<string, CliArgumentInfo> argumentInfos;
 
-			if (!TryGetCliArgumentInfos(typeof(T), out cliArgumentInfoDictionary)) {
-				result = default(T);
+			if (!TryGetCliArgumentInfos(typeof(T), out argumentInfos)) {
+				result = default;
 				return false;
 			}
 			result = new T();
 			for (int i = 0; i < args.Length; i++) {
-				CliArgumentInfo cliArgument;
+				CliArgumentInfo argumentInfo;
 
-				if (!cliArgumentInfoDictionary.TryGetValue(args[i].ToUpperInvariant(), out cliArgument)) {
+				if (!argumentInfos.TryGetValue(args[i].ToUpperInvariant(), out argumentInfo)) {
 					// 不是有效参数名
-					result = default(T);
+					result = default;
 					return false;
 				}
-				if (cliArgument.HasSetValue) {
+				if (argumentInfo.HasSetValue) {
 					// 重复设置参数
-					result = default(T);
+					result = default;
 					return false;
 				}
-				if (cliArgument.IsBoolean) {
+				if (argumentInfo.IsBoolean) {
 					// 是 bool 类型，所以不需要其它判断，直接赋值 true
-					if (!cliArgument.TrySetValue(result, true)) {
-						result = default(T);
+					if (!argumentInfo.TrySetValue(result, true)) {
+						result = default;
 						return false;
 					}
-					cliArgument.HasSetValue = true;
+					argumentInfo.HasSetValue = true;
 					continue;
 				}
 				if (i == args.Length - 1) {
 					// 需要提供值但是到末尾了，未提供值
-					result = default(T);
+					result = default;
 					return false;
 				}
 				else {
 					// 提供了值，设置值，并且跳过下一个
 					i++;
-					if (!cliArgument.TrySetValue(result, args[i])) {
-						result = default(T);
+					if (!argumentInfo.TrySetValue(result, args[i])) {
+						result = default;
 						return false;
 					}
-					cliArgument.HasSetValue = true;
+					argumentInfo.HasSetValue = true;
 					continue;
 				}
 			}
-			foreach (CliArgumentInfo cliArgumentInfo in cliArgumentInfoDictionary.Values)
+			foreach (CliArgumentInfo cliArgumentInfo in argumentInfos.Values)
 				if (!cliArgumentInfo.HasSetValue)
 					// 参数未设置值
 					if (cliArgumentInfo.IsRequired) {
 						// 是必选参数
-						result = default(T);
+						result = default;
 						return false;
 					}
 					else {
 						// 是可选参数
 						if (!cliArgumentInfo.TrySetValue(result, cliArgumentInfo.DefaultValue)) {
-							result = default(T);
+							result = default;
 							return false;
 						}
 					}

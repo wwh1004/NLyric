@@ -8,9 +8,6 @@ using NLyric.Settings;
 namespace NLyric {
 	public static class Program {
 		private static void Main(string[] args) {
-			if (args == null || args.Length == 0)
-				return;
-
 			CliArguments arguments;
 
 			try {
@@ -18,8 +15,11 @@ namespace NLyric {
 			}
 			catch {
 			}
-			if (!CommandLine.TryParse(args, out arguments))
-				throw new ArgumentException("命令行参数有误");
+			if (!CommandLine.TryParse(args, out arguments)) {
+				Logger.Instance.LogError("命令行参数有误");
+				Logger.Instance.LogInfo("用法：NLyric.exe -d \"音乐文件夹\"");
+				return;
+			}
 			AllSettings.Default = JsonConvert.DeserializeObject<AllSettings>(File.ReadAllText("Settings.json"));
 			CliWorker.ExecuteAsync(arguments).GetAwaiter().GetResult();
 			Logger.Instance.LogInfo("完成，请按任意键退出...");
