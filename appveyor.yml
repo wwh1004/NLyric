@@ -14,3 +14,11 @@ artifacts:
   name: NLyric-net472
 - path: NLyric\bin\Release\netcoreapp2.1\publish
   name: NLyric-netcoreapp2.1
+deploy:
+- provider: GitHub
+  release: NLyric
+  description: deployed by AppVeyor
+  auth_token:
+    secure: +8UJ1C312inNq+80I8WST34vPMrCylnmTx+9rmuIh1qnsArA5x2b8yc+kcwkXmQC
+  on:
+    APPVEYOR_REPO_TAG: true
