@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using NLyric.Ncm;
 
 namespace NLyric.Caches {
-	public sealed class LyricCache : IEquatable<LyricCache> {
+	public sealed class LyricCache {
 		public int Id { get; set; }
 
 		public bool IsAbsoluteMusic { get; set; }
@@ -33,31 +33,6 @@ namespace NLyric.Caches {
 			RawVersion = rawVersion;
 			TranslatedVersion = translatedVersion;
 			CheckSum = checkSum;
-		}
-
-		public static bool operator ==(LyricCache x, LyricCache y) {
-			if (x == null)
-				return x == null;
-			return x.Equals(y);
-		}
-
-		public static bool operator !=(LyricCache x, LyricCache y) {
-			return !(x == y);
-		}
-
-		public bool Equals(LyricCache obj) {
-			return !(obj is null) && obj.Id == Id && obj.CheckSum == CheckSum && obj.IsAbsoluteMusic == IsAbsoluteMusic && obj.RawVersion == RawVersion && obj.TranslatedVersion == TranslatedVersion;
-		}
-
-		public override bool Equals(object obj) {
-			LyricCache cache;
-
-			cache = obj as LyricCache;
-			return !(cache is null) && Equals(cache);
-		}
-
-		public override int GetHashCode() {
-			return Id.GetHashCode();
 		}
 	}
 }

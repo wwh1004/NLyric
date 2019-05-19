@@ -22,7 +22,7 @@ namespace NLyric {
 			_aes.Padding = PaddingMode.PKCS7;
 		}
 
-		public static int? TryGetMusicId(string filePath) {
+		public static bool TryGetMusicId(string filePath, out int trackId) {
 			string extension;
 			byte[] byt163Key;
 
@@ -38,9 +38,12 @@ namespace NLyric {
 				byt163Key = null;
 				break;
 			}
-			if (byt163Key == null)
-				return null;
-			return GetMusicId(byt163Key);
+			if (byt163Key == null) {
+				trackId = 0;
+				return false;
+			}
+			trackId = GetMusicId(byt163Key);
+			return true;
 		}
 
 		private static byte[] Get163Key(string filePath, bool isMp3) {
