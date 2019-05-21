@@ -4,8 +4,8 @@
     <Title>NLyric</Title>
     <Product>NLyric</Product>
     <Copyright>Copyright © 2019 Wwh</Copyright>
-    <AssemblyVersion>2.0.0.1</AssemblyVersion>
-    <FileVersion>2.0.0.1</FileVersion>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <FileVersion>2.0.1.0</FileVersion>
     <OutputType>Exe</OutputType>
     <TargetFrameworks>netcoreapp2.1;net472</TargetFrameworks>
     <RootNamespace>NLyric</RootNamespace>

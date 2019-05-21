@@ -25,7 +25,7 @@ namespace NLyric {
 		// TrackId -> Lyric
 		private static AllCaches _allCaches;
 
-		public static async Task ExecuteAsync(CliArguments arguments) {
+		public static async Task ExecuteAsync(Arguments arguments) {
 			Logger.Instance.LogInfo("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
 			Logger.Instance.LogNewLine();
 			LoadLocalCaches(arguments.Directory);

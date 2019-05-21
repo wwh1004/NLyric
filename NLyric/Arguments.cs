@@ -2,11 +2,12 @@ using System.Cli;
 using System.IO;
 
 namespace NLyric {
-	internal sealed class CliArguments {
+	internal sealed class Arguments {
 		private string _directory;
 
-		[CliArgument("-d", IsRequired = true)]
-		internal string CliDirectory {
+		[Argument("-d", IsRequired = true, Type = "DIR", Description = "存放音乐的文件夹，可以是相对路径或者绝对路径")]
+		public string Directory {
+			get => _directory;
 			set {
 				if (!System.IO.Directory.Exists(value))
 					throw new DirectoryNotFoundException();
@@ -14,7 +15,5 @@ namespace NLyric {
 				_directory = Path.GetFullPath(value);
 			}
 		}
-
-		public string Directory => _directory;
 	}
 }

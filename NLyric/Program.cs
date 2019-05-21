@@ -8,7 +8,12 @@ using NLyric.Settings;
 namespace NLyric {
 	public static class Program {
 		private static void Main(string[] args) {
-			CliArguments arguments;
+			if (args == null || args.Length == 0) {
+				CommandLine.ShowUsage<Arguments>();
+				return;
+			}
+
+			Arguments arguments;
 
 			try {
 				Console.Title = GetTitle();
@@ -16,14 +21,15 @@ namespace NLyric {
 			catch {
 			}
 			if (!CommandLine.TryParse(args, out arguments)) {
-				Logger.Instance.LogError("命令行参数有误");
-				Logger.Instance.LogInfo("用法：NLyric.exe -d \"音乐文件夹\"");
+				CommandLine.ShowUsage<Arguments>();
 				return;
 			}
 			AllSettings.Default = JsonConvert.DeserializeObject<AllSettings>(File.ReadAllText("Settings.json"));
 			CliWorker.ExecuteAsync(arguments).GetAwaiter().GetResult();
-			Logger.Instance.LogInfo("完成，请按任意键退出...");
+			Logger.Instance.LogInfo("完成", ConsoleColor.Green);
+#if DEBUG
 			Console.ReadKey(true);
+#endif
 		}
 
 		private static string GetTitle() {
