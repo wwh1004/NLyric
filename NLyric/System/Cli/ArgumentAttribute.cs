@@ -36,6 +36,8 @@ namespace System.Cli {
 		/// 构造器
 		/// </summary>
 		/// <param name="name">参数名</param>
-		public ArgumentAttribute(string name) => _name = name;
+		public ArgumentAttribute(string name) {
+			_name = name;
+		}
 	}
 }
