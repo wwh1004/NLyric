@@ -16,7 +16,7 @@ artifacts:
   name: NLyric-netcoreapp2.1
 deploy:
 - provider: GitHub
-  tag: v$(APPVEYOR_REPO_TAG_NAME)
+  tag: $(APPVEYOR_REPO_TAG_NAME)
   release: NLyric
   auth_token:
     secure: +8UJ1C312inNq+80I8WST34vPMrCylnmTx+9rmuIh1qnsArA5x2b8yc+kcwkXmQC
