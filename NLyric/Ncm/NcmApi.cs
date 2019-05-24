@@ -9,7 +9,7 @@ namespace NLyric.Ncm {
 	/// 网易云音乐API，内容不完整，可根据 https://binaryify.github.io/NeteaseCloudMusicApi 自己添加
 	/// </summary>
 	public static class NcmApi {
-		private const string SEARCH_URL = "http://musicapi.leanapp.cn/search";
+		private const string SEARCH_URL = "http://music.163.com/api/search/pc";
 		private const string ALBUM_URL = "http://musicapi.leanapp.cn/album";
 		private const string LYRIC_URL = "http://music.163.com/api/song/lyric";
 
@@ -27,7 +27,7 @@ namespace NLyric.Ncm {
 			FormUrlEncodedCollection parameters;
 
 			parameters = new FormUrlEncodedCollection {
-				{ "keywords", string.Join(" ", keywords) },
+				{ "s", string.Join(" ", keywords) },
 				{ "type", ((int)type).ToString() },
 				{ "limit", limit.ToString() }
 			};
