@@ -2,7 +2,7 @@
   "profiles": {
     "NLyric": {
       "commandName": "Project",
-      "commandLineArgs": "-d \"Music\""
+      "commandLineArgs": "-d \"G:\\Music\""
     }
   }
 }

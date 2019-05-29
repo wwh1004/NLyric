@@ -128,7 +128,7 @@ namespace NLyric {
 				else {
 					// 歌词非NLyric创建
 					if (!_lyricSettings.Overwriting) {
-						Logger.Instance.LogInfo("本地歌词已存在并且非NLyric创建，正在跳过。", ConsoleColor.Yellow);
+						Logger.Instance.LogInfo("本地歌词已存在并且非NLyric创建，正在跳过。", ConsoleColor.Cyan);
 						return;
 					}
 				}
@@ -140,7 +140,7 @@ namespace NLyric {
 				lyric = lrc.ToString();
 				UpdateCache(ncmLyric, ComputeLyricCheckSum(lyric));
 				File.WriteAllText(lrcPath, lyric);
-				Logger.Instance.LogInfo("本地歌词下载完毕。");
+				Logger.Instance.LogInfo("本地歌词下载完毕。", ConsoleColor.Magenta);
 			}
 		}
 
@@ -418,20 +418,20 @@ namespace NLyric {
 			if (result != null && (isExact || Confirm("不完全相似，是否使用自动匹配结果？")))
 				// 自动匹配成功，如果是完全匹配，不需要用户再次确认，反正由用户再次确认
 				return result;
-			return fuzzy ? Select(sources.OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities) : null;
+			return fuzzy ? Select(sources.Where(t => nameSimilarities[t] > _matchSettings.MinimumSimilarityUser).OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities) : null;
 			// fuzzy为true时是第二次搜索了，再让用户再次手动从搜索结果中选择，自动匹配失败的原因可能是 Settings.Match.MinimumSimilarity 设置太大了
 		}
 
-		private static TSource Match<TSource, TTarget>(IEnumerable<TSource> sources, TTarget target, Dictionary<TSource, double> nameSimilarities, out bool isExact) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
+		private static TSource Match<TSource, TTarget>(TSource[] sources, TTarget target, Dictionary<TSource, double> nameSimilarities, out bool isExact) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
 			foreach (TSource source in sources) {
 				double nameSimilarity;
 
 				nameSimilarity = nameSimilarities[source];
-				if (nameSimilarity < _matchSettings.MinimumSimilarity)
+				if (nameSimilarity < _matchSettings.MinimumSimilarityAuto)
 					continue;
 				foreach (string ncmArtist in source.Artists)
 					foreach (string artist in target.Artists)
-						if (ComputeSimilarity(ncmArtist, artist, false) >= _matchSettings.MinimumSimilarity) {
+						if (ComputeSimilarity(ncmArtist, artist, false) >= _matchSettings.MinimumSimilarityAuto) {
 							Logger.Instance.LogInfo(
 								"自动匹配结果：" + Environment.NewLine +
 								"网易云音乐：" + source.ToString() + Environment.NewLine +
@@ -448,6 +448,8 @@ namespace NLyric {
 		private static TSource Select<TSource, TTarget>(TSource[] sources, TTarget target, Dictionary<TSource, double> nameSimilarities) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
 			TSource result;
 
+			if (sources.Length == 0)
+				return null;
 			Logger.Instance.LogInfo("请手动输入1,2,3...选择匹配的项，若不存在，请输入Pass。");
 			Logger.Instance.LogInfo("对比项：" + TrackOrAlbumToString(target));
 			for (int i = 0; i < sources.Length; i++) {

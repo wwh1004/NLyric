@@ -31,7 +31,8 @@
 		] // Feat.的各种写法
 	},
 	"Match": { // 匹配设置，在搜索到歌曲信息之后，程序会通过自己的算法再次确认是否匹配
-		"MinimumSimilarity": 0.9, // 最小相似度，0~1
+		"MinimumSimilarityAuto": 0.9, // 自动匹配时要求的最小相似度，0~1
+		"MinimumSimilarityUser": 0.5, // 用户匹配时的最小相似度，小于设定值的将不予显示，0~1
 		"CharReplace": {
 			"\u00B7": "\u002e",
 			"\u0387": "\u002e",
