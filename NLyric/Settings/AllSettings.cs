@@ -6,15 +6,17 @@ namespace NLyric.Settings {
 
 		public static AllSettings Default {
 			get {
-				if (_default == null)
+				if (_default is null)
 					throw new InvalidOperationException();
+
 				return _default;
 			}
 			set {
-				if (value == null)
+				if (value is null)
 					throw new ArgumentNullException(nameof(value));
-				if (_default != null)
+				if (!(_default is null))
 					throw new InvalidOperationException();
+
 				_default = value;
 			}
 		}

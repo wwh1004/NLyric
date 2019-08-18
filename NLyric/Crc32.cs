@@ -24,7 +24,7 @@ namespace NLyric {
 		}
 
 		public static uint Compute(byte[] data) {
-			if (data == null)
+			if (data is null)
 				throw new ArgumentNullException(nameof(data));
 
 			uint crc32;

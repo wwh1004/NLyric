@@ -26,11 +26,11 @@ namespace NLyric.Caches {
 		}
 
 		public TrackCache(string name, string[] artists, string albumName, string fileName, int id) {
-			if (name == null)
+			if (name is null)
 				throw new ArgumentNullException(nameof(name));
-			if (artists == null)
+			if (artists is null)
 				throw new ArgumentNullException(nameof(artists));
-			if (albumName == null && fileName == null)
+			if (albumName is null && fileName is null)
 				throw new ArgumentException($"{nameof(albumName)} 和 {nameof(fileName)} 不能同时为 null");
 
 			Name = name;

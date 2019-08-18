@@ -12,13 +12,11 @@ namespace NLyric {
 		}
 
 		public void LogNewLine() {
-			lock (_syncRoot)
-				Console.WriteLine();
+			LogInfo(string.Empty, ConsoleColor.Gray);
 		}
 
 		public void LogInfo(string value) {
-			lock (_syncRoot)
-				Console.WriteLine(value);
+			LogInfo(value, ConsoleColor.Gray);
 		}
 
 		public void LogWarning(string value) {
@@ -41,14 +39,14 @@ namespace NLyric {
 		}
 
 		public void LogException(Exception value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			LogError(ExceptionToString(value));
 		}
 
 		private static string ExceptionToString(Exception exception) {
-			if (exception == null)
+			if (exception is null)
 				throw new ArgumentNullException(nameof(exception));
 
 			StringBuilder sb;
@@ -65,7 +63,7 @@ namespace NLyric {
 			sb.AppendLine("StackTrace: " + Environment.NewLine + exception.StackTrace);
 			sb.AppendLine("TargetSite: " + Environment.NewLine + exception.TargetSite.ToString());
 			sb.AppendLine("----------------------------------------");
-			if (exception.InnerException != null)
+			if (!(exception.InnerException is null))
 				DumpException(exception.InnerException, sb);
 		}
 	}

@@ -25,7 +25,7 @@ namespace NLyric.Caches {
 		}
 
 		public LyricCache(int id, bool isAbsoluteMusic, int rawVersion, int translatedVersion, string checkSum) {
-			if (checkSum == null)
+			if (checkSum is null)
 				throw new ArgumentNullException(nameof(checkSum));
 
 			Id = id;

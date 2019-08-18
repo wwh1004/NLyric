@@ -10,9 +10,9 @@ namespace NLyric.Audio {
 		public string[] Artists => _artists;
 
 		public Track(string name, string[] artists) {
-			if (name == null)
+			if (name is null)
 				throw new ArgumentNullException(nameof(name));
-			if (artists == null)
+			if (artists is null)
 				throw new ArgumentNullException(nameof(artists));
 
 			_name = name;
@@ -20,7 +20,7 @@ namespace NLyric.Audio {
 		}
 
 		public Track(ATL.Track track) {
-			if (track == null)
+			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 
 			_name = track.Title.GetSafeString();

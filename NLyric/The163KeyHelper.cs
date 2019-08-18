@@ -38,7 +38,7 @@ namespace NLyric {
 				byt163Key = null;
 				break;
 			}
-			if (byt163Key == null) {
+			if (byt163Key is null) {
 				trackId = 0;
 				return false;
 			}

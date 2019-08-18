@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -11,34 +10,32 @@ namespace System.Extensions {
 			return client.SendAsync(method, url, null, null);
 		}
 
-		public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpMethod method, string url, IEnumerable<KeyValuePair<string, string>> parameters, IEnumerable<KeyValuePair<string, string>> headers) {
-			return client.SendAsync(method, url, parameters, headers, (byte[])null, "application/x-www-form-urlencoded");
+		public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpMethod method, string url, IEnumerable<KeyValuePair<string, string>> queries, IEnumerable<KeyValuePair<string, string>> headers) {
+			return client.SendAsync(method, url, queries, headers, (byte[])null, "application/x-www-form-urlencoded");
 		}
 
-		public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpMethod method, string url, IEnumerable<KeyValuePair<string, string>> parameters, IEnumerable<KeyValuePair<string, string>> headers, string content, string contentType) {
-			return client.SendAsync(method, url, parameters, headers, content == null ? null : Encoding.UTF8.GetBytes(content), contentType);
+		public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpMethod method, string url, IEnumerable<KeyValuePair<string, string>> queries, IEnumerable<KeyValuePair<string, string>> headers, string content, string contentType) {
+			return client.SendAsync(method, url, queries, headers, content is null ? null : Encoding.UTF8.GetBytes(content), contentType);
 		}
 
-		public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpMethod method, string url, IEnumerable<KeyValuePair<string, string>> parameters, IEnumerable<KeyValuePair<string, string>> headers, byte[] content, string contentType) {
-			if (client == null)
+		public static Task<HttpResponseMessage> SendAsync(this HttpClient client, HttpMethod method, string url, IEnumerable<KeyValuePair<string, string>> queries, IEnumerable<KeyValuePair<string, string>> headers, byte[] content, string contentType) {
+			if (client is null)
 				throw new ArgumentNullException(nameof(client));
-			if (method == null)
+			if (method is null)
 				throw new ArgumentNullException(nameof(method));
 			if (string.IsNullOrEmpty(url))
 				throw new ArgumentNullException(nameof(url));
 			if (string.IsNullOrEmpty(contentType))
 				throw new ArgumentNullException(nameof(contentType));
-			if (method != HttpMethod.Get && parameters != null && content != null)
-				throw new NotSupportedException();
 
 			UriBuilder uriBuilder;
 			HttpRequestMessage request;
 
 			uriBuilder = new UriBuilder(url);
-			if (parameters != null && method == HttpMethod.Get) {
+			if (!(queries is null)) {
 				string query;
 
-				query = FormToString(parameters);
+				query = queries.ToQueryString();
 				if (!string.IsNullOrEmpty(query))
 					if (string.IsNullOrEmpty(uriBuilder.Query))
 						uriBuilder.Query = query;
@@ -46,29 +43,16 @@ namespace System.Extensions {
 						uriBuilder.Query += "&" + query;
 			}
 			request = new HttpRequestMessage(method, uriBuilder.Uri);
-			if (content != null)
+			if (!(content is null))
 				request.Content = new ByteArrayContent(content);
-			else if (parameters != null && method != HttpMethod.Get)
-				request.Content = new FormUrlEncodedContent(parameters);
-			if (request.Content != null)
+			else if (!(queries is null) && method != HttpMethod.Get)
+				request.Content = new FormUrlEncodedContent(queries);
+			if (!(request.Content is null))
 				request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-			if (headers != null)
-				UpdateHeaders(request.Headers, headers);
+			if (!(headers is null))
+				foreach (KeyValuePair<string, string> header in headers)
+					request.Headers.TryAddWithoutValidation(header.Key, header.Value);
 			return client.SendAsync(request);
-		}
-
-		private static string FormToString(IEnumerable<KeyValuePair<string, string>> values) {
-			return string.Join("&", values.Select(t => t.Key + "=" + Uri.EscapeDataString(t.Value)));
-		}
-
-		private static void UpdateHeaders(HttpRequestHeaders requestHeaders, IEnumerable<KeyValuePair<string, string>> headers) {
-			if (requestHeaders == null)
-				throw new ArgumentNullException(nameof(requestHeaders));
-			if (headers == null)
-				throw new ArgumentNullException(nameof(headers));
-
-			foreach (KeyValuePair<string, string> item in headers)
-				requestHeaders.TryAddWithoutValidation(item.Key, item.Value);
 		}
 	}
 }

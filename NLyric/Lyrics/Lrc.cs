@@ -16,12 +16,12 @@ namespace NLyric.Lyrics {
 		private string _album;
 		private string _by;
 		private TimeSpan? _offset;
-		private readonly Dictionary<TimeSpan, string> _lyrics = new Dictionary<TimeSpan, string>();
+		private Dictionary<TimeSpan, string> _lyrics = new Dictionary<TimeSpan, string>();
 
 		public string Title {
 			get => _title;
 			set {
-				if (value == null) {
+				if (value is null) {
 					_title = value;
 					return;
 				}
@@ -33,7 +33,7 @@ namespace NLyric.Lyrics {
 		public string Artist {
 			get => _artist;
 			set {
-				if (value == null) {
+				if (value is null) {
 					_artist = value;
 					return;
 				}
@@ -45,7 +45,7 @@ namespace NLyric.Lyrics {
 		public string Album {
 			get => _album;
 			set {
-				if (value == null) {
+				if (value is null) {
 					_album = value;
 					return;
 				}
@@ -57,7 +57,7 @@ namespace NLyric.Lyrics {
 		public string By {
 			get => _by;
 			set {
-				if (value == null) {
+				if (value is null) {
 					_by = value;
 					return;
 				}
@@ -68,10 +68,18 @@ namespace NLyric.Lyrics {
 
 		public TimeSpan? Offset {
 			get => _offset;
-			set => _offset = (value == null || value.Value.Ticks == 0) ? null : value;
+			set => _offset = (value is null || value.Value.Ticks == 0) ? null : value;
 		}
 
-		public Dictionary<TimeSpan, string> Lyrics => _lyrics;
+		public Dictionary<TimeSpan, string> Lyrics {
+			get => _lyrics;
+			set {
+				if (value is null)
+					throw new ArgumentNullException(nameof(value));
+
+				_lyrics = value;
+			}
+		}
 
 		public static Lrc Parse(string text) {
 			if (string.IsNullOrEmpty(text))
@@ -83,7 +91,7 @@ namespace NLyric.Lyrics {
 			using (StringReader reader = new StringReader(text)) {
 				string line;
 
-				while ((line = reader.ReadLine()) != null)
+				while (!((line = reader.ReadLine()) is null))
 					if (!TryParseLine(line.Trim(), lrc))
 						throw new FormatException();
 			}
@@ -100,7 +108,7 @@ namespace NLyric.Lyrics {
 			using (StringReader reader = new StringReader(text)) {
 				string line;
 
-				while ((line = reader.ReadLine()) != null)
+				while (!((line = reader.ReadLine()) is null))
 					TryParseLine(line.Trim(), lrc);
 			}
 			return lrc;
@@ -164,15 +172,15 @@ namespace NLyric.Lyrics {
 			StringBuilder sb;
 
 			sb = new StringBuilder();
-			if (_title != null)
+			if (!(_title is null))
 				AppendLine(sb, TI, _title);
-			if (_artist != null)
+			if (!(_artist is null))
 				AppendLine(sb, AR, _artist);
-			if (_album != null)
+			if (!(_album is null))
 				AppendLine(sb, AL, _album);
-			if (_by != null)
+			if (!(_by is null))
 				AppendLine(sb, BY, _by);
-			if (_offset != null)
+			if (!(_offset is null))
 				AppendLine(sb, OFFSET, ((long)_offset.Value.TotalMilliseconds).ToString());
 			foreach (KeyValuePair<TimeSpan, string> lyric in _lyrics)
 				sb.AppendLine($"[{TimeSpanToLyricString(lyric.Key)}]{lyric.Value}");

@@ -6,7 +6,7 @@ using System.Text;
 namespace System.Cli {
 	internal static class CommandLine {
 		public static T Parse<T>(string[] args) where T : new() {
-			if (args == null)
+			if (args is null)
 				throw new ArgumentNullException(nameof(args));
 
 			T result;
@@ -17,7 +17,7 @@ namespace System.Cli {
 		}
 
 		public static bool TryParse<T>(string[] args, out T result) where T : new() {
-			if (args == null) {
+			if (args is null) {
 				result = default;
 				return false;
 			}
@@ -102,7 +102,7 @@ namespace System.Cli {
 
 				if (!VerifyProperty(propertyInfo, out attribute))
 					return false;
-				if (attribute == null)
+				if (attribute is null)
 					continue;
 				argumentInfos.Add(new ArgumentInfo(attribute, propertyInfo));
 			}
@@ -135,7 +135,7 @@ namespace System.Cli {
 					argumentInfos = null;
 					return false;
 				}
-				if (attribute != null)
+				if (!(attribute is null))
 					argumentInfos.Add(attribute.Name, new ArgumentInfo(attribute, propertyInfo));
 			}
 			return true;
@@ -147,7 +147,7 @@ namespace System.Cli {
 
 			argumentAttribute = null;
 			attributes = propertyInfo.GetCustomAttributes(typeof(ArgumentAttribute), false);
-			if (attributes == null || attributes.Length == 0)
+			if (attributes is null || attributes.Length == 0)
 				// 排除未应用 ArgumentAttribute 的属性
 				return true;
 			if (attributes.Length != 1)
@@ -169,13 +169,18 @@ namespace System.Cli {
 					argumentAttribute = null;
 					return false;
 				}
-			if (argumentAttribute.IsRequired && argumentAttribute.DefaultValue != null) {
+			if (argumentAttribute.IsRequired && !(argumentAttribute.DefaultValue is null)) {
 				// 是必选参数但有默认值
 				argumentAttribute = null;
 				return false;
 			}
-			if (argumentAttribute.DefaultValue != null && argumentAttribute.DefaultValue.GetType() != propertyType) {
+			if (!(argumentAttribute.DefaultValue is null) && argumentAttribute.DefaultValue.GetType() != propertyType) {
 				// 有默认值但默认值的类型与属性的类型不相同
+				argumentAttribute = null;
+				return false;
+			}
+			if (!(argumentAttribute.Type is null) && propertyType == typeof(bool)) {
+				// 返回类型为bool并且Type属性有值
 				argumentAttribute = null;
 				return false;
 			}
@@ -206,7 +211,7 @@ namespace System.Cli {
 
 			public bool IsBoolean {
 				get {
-					if (_cachedIsBoolean == null)
+					if (_cachedIsBoolean is null)
 						_cachedIsBoolean = _propertyInfo.PropertyType == typeof(bool);
 					return _cachedIsBoolean.Value;
 				}

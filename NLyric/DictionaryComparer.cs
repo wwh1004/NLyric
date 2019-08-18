@@ -6,7 +6,7 @@ namespace NLyric {
 		private readonly Dictionary<TKey, TValue> _dictionary;
 
 		public DictionaryComparer(Dictionary<TKey, TValue> dictionary) {
-			if (dictionary == null)
+			if (dictionary is null)
 				throw new ArgumentNullException(nameof(dictionary));
 
 			_dictionary = dictionary;

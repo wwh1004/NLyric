@@ -17,7 +17,7 @@ namespace NLyric.Caches {
 		}
 
 		public AlbumCache(string name, int id) {
-			if (name == null)
+			if (name is null)
 				throw new ArgumentNullException(nameof(name));
 
 			Name = name;

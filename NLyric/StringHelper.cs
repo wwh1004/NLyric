@@ -16,7 +16,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string GetSafeString(this string value) {
-			return value == null ? string.Empty : value.Trim();
+			return value is null ? string.Empty : value.Trim();
 		}
 
 		/// <summary>
@@ -25,7 +25,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string ReplaceEx(this string value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			return value.ToHalfWidth().WholeWordReplace().CharReplace();
@@ -37,7 +37,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string WholeWordReplace(this string value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			if (value.Length == 0)
@@ -54,7 +54,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string CharReplace(this string value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			StringBuilder buffer;
@@ -75,7 +75,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string Fuzzy(this string value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			int fuzzyStartIndex;
@@ -97,7 +97,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string[] SplitEx(this string value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			return value.Split(_searchSettings.Separators, StringSplitOptions.RemoveEmptyEntries);
@@ -109,7 +109,7 @@ namespace NLyric {
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public static string ToHalfWidth(this string value) {
-			if (value == null)
+			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
 			char[] chars;

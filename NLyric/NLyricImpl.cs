@@ -12,7 +12,7 @@ using NLyric.Ncm;
 using NLyric.Settings;
 
 namespace NLyric {
-	internal static partial class CliWorker {
+	internal static class NLyricImpl {
 		private static readonly SearchSettings _searchSettings = AllSettings.Default.Search;
 		private static readonly FuzzySettings _fuzzySettings = AllSettings.Default.Fuzzy;
 		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
@@ -23,12 +23,14 @@ namespace NLyric {
 		// AlbumId -> Tracks
 		private static readonly Dictionary<int, NcmLyric> _cachedNcmLyrics = new Dictionary<int, NcmLyric>();
 		// TrackId -> Lyric
+		private static string _allCachesPath;
 		private static AllCaches _allCaches;
 
 		public static async Task ExecuteAsync(Arguments arguments) {
 			Logger.Instance.LogInfo("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
 			Logger.Instance.LogNewLine();
-			LoadLocalCaches(arguments.Directory);
+			_allCachesPath = Path.Combine(arguments.Directory, ".nlyric");
+			LoadLocalCaches();
 			foreach (string audioPath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string lrcPath;
 				int? trackId;
@@ -39,14 +41,14 @@ namespace NLyric {
 				Logger.Instance.LogInfo($"开始搜索文件\"{Path.GetFileName(audioPath)}\"的歌词。");
 				trackId = await TryGetMusicId(audioPath);
 				// 同时尝试通过163Key和专辑获取歌曲信息
-				if (trackId == null)
+				if (trackId is null)
 					Logger.Instance.LogWarning($"无法找到文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID！");
 				else
 					await WriteLrcAsync(trackId.Value, lrcPath);
 				Logger.Instance.LogNewLine();
 				Logger.Instance.LogNewLine();
 			}
-			SaveLocalCaches(arguments.Directory);
+			SaveLocalCaches();
 		}
 
 		private static bool CanSkip(string audioPath, string lrcPath) {
@@ -80,7 +82,7 @@ namespace NLyric {
 			try {
 				// 歌曲无163Key，通过自己的算法匹配
 				ncmTrack = await MapToAsync(track, album, audioPath);
-				if (ncmTrack != null) {
+				if (!(ncmTrack is null)) {
 					trackId = ncmTrack.Id;
 					Logger.Instance.LogInfo($"已获取文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID: {trackId}。");
 				}
@@ -110,16 +112,18 @@ namespace NLyric {
 			}
 			if (hasLrcFile) {
 				// 如果歌词存在，判断是否需要覆盖或更新
-				if (lyricCache != null && lyricCache.CheckSum == lyricCheckSum) {
+				if (!(lyricCache is null) && lyricCache.CheckSum == lyricCheckSum) {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricCache.RawVersion && ncmLyric.TranslatedVersion <= lyricCache.TranslatedVersion) {
 						// 是最新版本
-						Logger.Instance.LogInfo("本地歌词已是最新版本，正在跳过。", ConsoleColor.Green);
+						Logger.Instance.LogInfo("本地歌词已是最新版本，正在跳过。", ConsoleColor.Yellow);
 						return;
 					}
 					else {
 						// 不是最新版本
-						if (!_lyricSettings.AutoUpdate) {
+						if (_lyricSettings.AutoUpdate)
+							Logger.Instance.LogInfo("本地歌词不是最新版本，正在更新。", ConsoleColor.Green);
+						else {
 							Logger.Instance.LogInfo("本地歌词不是最新版本但是自动更新被禁止，正在跳过。", ConsoleColor.Yellow);
 							return;
 						}
@@ -128,13 +132,13 @@ namespace NLyric {
 				else {
 					// 歌词非NLyric创建
 					if (!_lyricSettings.Overwriting) {
-						Logger.Instance.LogInfo("本地歌词已存在并且非NLyric创建，正在跳过。", ConsoleColor.Cyan);
+						Logger.Instance.LogInfo("本地歌词已存在并且非NLyric创建，正在跳过。", ConsoleColor.Yellow);
 						return;
 					}
 				}
 			}
 			lrc = ToLrc(ncmLyric);
-			if (lrc != null) {
+			if (!(lrc is null)) {
 				string lyric;
 
 				lyric = lrc.ToString();
@@ -153,9 +157,9 @@ namespace NLyric {
 		/// <param name="audioPath"></param>
 		/// <returns></returns>
 		private static async Task<NcmTrack> MapToAsync(Track track, Album album, string audioPath) {
-			if (track == null)
+			if (track is null)
 				throw new ArgumentNullException(nameof(track));
-			if (audioPath == null)
+			if (audioPath is null)
 				throw new ArgumentNullException(nameof(audioPath));
 
 			string fileName;
@@ -164,9 +168,9 @@ namespace NLyric {
 			NcmTrack ncmTrack;
 
 			fileName = Path.GetFileName(audioPath);
-			trackCache = album == null ? _allCaches.TrackCaches.Match(track, fileName) : _allCaches.TrackCaches.Match(track, album);
+			trackCache = album is null ? _allCaches.TrackCaches.Match(track, fileName) : _allCaches.TrackCaches.Match(track, album);
 			// 有专辑信息就用专辑信息，没有专辑信息就用文件名
-			if (trackCache != null)
+			if (!(trackCache is null))
 				return new NcmTrack(track, trackCache.Id);
 			// 先尝试从缓存获取歌曲
 			if (The163KeyHelper.TryGetMusicId(audioPath, out trackId)) {
@@ -177,21 +181,21 @@ namespace NLyric {
 				NcmAlbum ncmAlbum;
 
 				ncmAlbum = null;
-				if (album != null) {
+				if (!(album is null)) {
 					// 存在专辑信息，尝试获取网易云音乐上对应的专辑
 					AlbumCache albumCache;
 
 					albumCache = _allCaches.AlbumCaches.Match(album);
-					if (albumCache != null)
+					if (!(albumCache is null))
 						ncmAlbum = new NcmAlbum(album, albumCache.Id);
 					// 先尝试从缓存获取专辑
-					if (ncmAlbum == null) {
+					if (ncmAlbum is null) {
 						ncmAlbum = await MapToAsync(album);
-						if (ncmAlbum != null)
+						if (!(ncmAlbum is null))
 							UpdateCache(album, ncmAlbum.Id);
 					}
 				}
-				if (ncmAlbum == null) {
+				if (ncmAlbum is null) {
 					// 没有对应的专辑信息，使用无专辑匹配
 					ncmTrack = await MapToAsync(track);
 				}
@@ -202,16 +206,16 @@ namespace NLyric {
 					ncmTracks = (await GetTracksAsync(ncmAlbum)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
 					// 获取网易云音乐上专辑收录的歌曲
 					ncmTrack = MatchByUser(ncmTracks, track);
-					if (ncmTrack == null)
+					if (ncmTrack is null)
 						// 网易云音乐上的专辑可能没收录这个歌曲，不清楚为什么，但是确实存在这个情况，比如专辑id:3094396
 						ncmTrack = await MapToAsync(track);
 				}
 			}
-			if (ncmTrack == null)
+			if (ncmTrack is null)
 				Logger.Instance.LogWarning("歌曲匹配失败！");
 			else {
 				Logger.Instance.LogInfo("歌曲匹配成功！");
-				if (album == null)
+				if (album is null)
 					UpdateCache(track, fileName, ncmTrack.Id);
 				else
 					UpdateCache(track, album, ncmTrack.Id);
@@ -241,7 +245,7 @@ namespace NLyric {
 		/// <param name="track"></param>
 		/// <returns></returns>
 		private static async Task<NcmTrack> MapToAsync(Track track) {
-			if (track == null)
+			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 
 			NcmTrack ncmTrack;
@@ -249,7 +253,7 @@ namespace NLyric {
 			Logger.Instance.LogInfo($"开始搜索歌曲\"{track}\"。");
 			Logger.Instance.LogWarning("正在尝试带艺术家搜索，结果可能将过少！");
 			ncmTrack = await MapToAsync(track, true);
-			if (ncmTrack == null && _fuzzySettings.TryIgnoringArtists) {
+			if (ncmTrack is null && _fuzzySettings.TryIgnoringArtists) {
 				Logger.Instance.LogWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
 				ncmTrack = await MapToAsync(track, false);
 			}
@@ -262,7 +266,7 @@ namespace NLyric {
 		/// <param name="album"></param>
 		/// <returns></returns>
 		private static async Task<NcmAlbum> MapToAsync(Album album) {
-			if (album == null)
+			if (album is null)
 				throw new ArgumentNullException(nameof(album));
 
 			string replacedAlbumName;
@@ -274,11 +278,11 @@ namespace NLyric {
 			Logger.Instance.LogInfo($"开始搜索专辑\"{album}\"。");
 			Logger.Instance.LogWarning("正在尝试带艺术家搜索，结果可能将过少！");
 			ncmAlbum = await MapToAsync(album, true);
-			if (ncmAlbum == null && _fuzzySettings.TryIgnoringArtists) {
+			if (ncmAlbum is null && _fuzzySettings.TryIgnoringArtists) {
 				Logger.Instance.LogWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
 				ncmAlbum = await MapToAsync(album, false);
 			}
-			if (ncmAlbum == null) {
+			if (ncmAlbum is null) {
 				Logger.Instance.LogWarning("专辑匹配失败！");
 				_cachedNcmAlbums[replacedAlbumName] = null;
 				return null;
@@ -321,13 +325,10 @@ namespace NLyric {
 		#endregion
 
 		#region local cache
-		private static void LoadLocalCaches(string directoryPath) {
-			string cachePath;
-
-			cachePath = Path.Combine(directoryPath, ".nlyric");
-			if (File.Exists(cachePath)) {
-				_allCaches = JsonConvert.DeserializeObject<AllCaches>(File.ReadAllText(cachePath));
-				Logger.Instance.LogInfo($"搜索缓存\"{cachePath}\"已被加载。");
+		private static void LoadLocalCaches() {
+			if (File.Exists(_allCachesPath)) {
+				_allCaches = JsonConvert.DeserializeObject<AllCaches>(File.ReadAllText(_allCachesPath));
+				Logger.Instance.LogInfo($"搜索缓存\"{_allCachesPath}\"加载成功。");
 			}
 			else
 				_allCaches = new AllCaches() {
@@ -337,15 +338,16 @@ namespace NLyric {
 				};
 		}
 
-		private static void SaveLocalCaches(string directoryPath) {
-			string cachePath;
-
-			cachePath = Path.Combine(directoryPath, ".nlyric");
+		private static void SaveLocalCaches() {
 			_allCaches.AlbumCaches.Sort((x, y) => x.Name.CompareTo(y.Name));
 			_allCaches.TrackCaches.Sort((x, y) => x.Name.CompareTo(y.Name));
 			_allCaches.LyricCaches.Sort((x, y) => x.Id.CompareTo(y.Id));
+			SaveLocalCachesCore(_allCachesPath);
+			Logger.Instance.LogInfo($"搜索缓存\"{_allCachesPath}\"已被保存。");
+		}
+
+		private static void SaveLocalCachesCore(string cachePath) {
 			File.WriteAllText(cachePath, FormatJson(JsonConvert.SerializeObject(_allCaches)));
-			Logger.Instance.LogInfo($"搜索缓存\"{cachePath}\"已被保存。");
 		}
 
 		private static string FormatJson(string json) {
@@ -362,24 +364,30 @@ namespace NLyric {
 			AlbumCache cache;
 
 			cache = _allCaches.AlbumCaches.Match(album);
-			if (cache == null)
-				_allCaches.AlbumCaches.Add(new AlbumCache(album, id));
+			if (!(cache is null))
+				return;
+			_allCaches.AlbumCaches.Add(new AlbumCache(album, id));
+			OnCacheUpdated();
 		}
 
 		private static void UpdateCache(Track track, Album album, int id) {
 			TrackCache cache;
 
 			cache = _allCaches.TrackCaches.Match(track, album);
-			if (cache == null)
-				_allCaches.TrackCaches.Add(new TrackCache(track, album, id));
+			if (!(cache is null))
+				return;
+			_allCaches.TrackCaches.Add(new TrackCache(track, album, id));
+			OnCacheUpdated();
 		}
 
 		private static void UpdateCache(Track track, string fileName, int id) {
 			TrackCache cache;
 
 			cache = _allCaches.TrackCaches.Match(track, fileName);
-			if (cache == null)
-				_allCaches.TrackCaches.Add(new TrackCache(track, fileName, id));
+			if (!(cache is null))
+				return;
+			_allCaches.TrackCaches.Add(new TrackCache(track, fileName, id));
+			OnCacheUpdated();
 		}
 
 		private static void UpdateCache(NcmLyric lyric, string checkSum) {
@@ -389,6 +397,11 @@ namespace NLyric {
 			if (index != -1)
 				_allCaches.LyricCaches.RemoveAt(index);
 			_allCaches.LyricCaches.Add(new LyricCache(lyric, checkSum));
+			OnCacheUpdated();
+		}
+
+		private static void OnCacheUpdated() {
+			SaveLocalCachesCore(_allCachesPath);
 		}
 		#endregion
 
@@ -399,7 +412,7 @@ namespace NLyric {
 			if (sources.Length == 0)
 				return null;
 			result = MatchByUser(sources, target, false);
-			if (result == null && _fuzzySettings.TryIgnoringExtraInfo)
+			if (result is null && _fuzzySettings.TryIgnoringExtraInfo)
 				result = MatchByUser(sources, target, true);
 			return result;
 		}
@@ -415,8 +428,8 @@ namespace NLyric {
 			foreach (TSource source in sources)
 				nameSimilarities[source] = ComputeSimilarity(source.Name, target.Name, fuzzy);
 			result = Match(sources, target, nameSimilarities, out isExact);
-			if (result != null && (isExact || Confirm("不完全相似，是否使用自动匹配结果？")))
-				// 自动匹配成功，如果是完全匹配，不需要用户再次确认，反正由用户再次确认
+			if (isExact)
+				// 自动匹配成功，如果是完全匹配，不需要用户再次确认
 				return result;
 			return fuzzy ? Select(sources.Where(t => nameSimilarities[t] > _matchSettings.MinimumSimilarityUser).OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities) : null;
 			// fuzzy为true时是第二次搜索了，再让用户再次手动从搜索结果中选择，自动匹配失败的原因可能是 Settings.Match.MinimumSimilarity 设置太大了
@@ -482,7 +495,7 @@ namespace NLyric {
 				}
 				Logger.Instance.LogWarning("输入有误，请重新输入！");
 			} while (true);
-			if (result != null)
+			if (!(result is null))
 				Logger.Instance.LogInfo("已选择：" + result.ToString());
 			return result;
 
@@ -491,23 +504,6 @@ namespace NLyric {
 					return trackOrAlbum.Name;
 				return trackOrAlbum.Name + " by " + string.Join(",", trackOrAlbum.Artists);
 			}
-		}
-
-		private static bool Confirm(string text) {
-			Logger.Instance.LogInfo(text);
-			Logger.Instance.LogInfo("请手动输入Yes或No。");
-			do {
-				string userInput;
-
-				userInput = Console.ReadLine().Trim().ToUpperInvariant();
-				switch (userInput) {
-				case "YES":
-					return true;
-				case "NO":
-					return false;
-				}
-				Logger.Instance.LogWarning("输入有误，请重新输入！");
-			} while (true);
 		}
 
 		private static double ComputeSimilarity(string x, string y, bool fuzzy) {
@@ -543,20 +539,24 @@ namespace NLyric {
 				Logger.Instance.LogWarning("当前歌曲是纯音乐无歌词！");
 				return null;
 			}
+			if (!(lyric.Raw is null))
+				NormalizeLyric(lyric.Raw, false);
+			if (!(lyric.Translated is null))
+				NormalizeLyric(lyric.Translated, _lyricSettings.SimplifyTranslated);
 			foreach (string mode in _lyricSettings.Modes) {
 				switch (mode.ToUpperInvariant()) {
 				case "MERGED":
-					if (lyric.Raw == null || lyric.Translated == null)
+					if (lyric.Raw is null || lyric.Translated is null)
 						continue;
 					Logger.Instance.LogInfo("已获取混合歌词。");
 					return MergeLyric(lyric.Raw, lyric.Translated);
 				case "RAW":
-					if (lyric.Raw == null)
+					if (lyric.Raw is null)
 						continue;
 					Logger.Instance.LogInfo("已获取原始歌词。");
 					return lyric.Raw;
 				case "TRANSLATED":
-					if (lyric.Translated == null)
+					if (lyric.Translated is null)
 						continue;
 					Logger.Instance.LogInfo("已获取翻译歌词。");
 					return lyric.Translated;
@@ -568,12 +568,22 @@ namespace NLyric {
 			return null;
 		}
 
-		private static Lrc MergeLyric(Lrc rawLrc, Lrc translatedLrc) {
-			if (rawLrc == null)
-				throw new ArgumentNullException(nameof(rawLrc));
-			if (translatedLrc == null)
-				throw new ArgumentNullException(nameof(translatedLrc));
+		private static void NormalizeLyric(Lrc lrc, bool simplify) {
+			Dictionary<TimeSpan, string> newLyrics;
 
+			newLyrics = new Dictionary<TimeSpan, string>(lrc.Lyrics.Count);
+			foreach (KeyValuePair<TimeSpan, string> lyric in lrc.Lyrics) {
+				string value;
+
+				value = lyric.Value.Trim('/', ' ');
+				if (simplify)
+					value = ChineseConverter.TraditionalToSimplified(value);
+				newLyrics.Add(lyric.Key, value);
+			}
+			lrc.Lyrics = newLyrics;
+		}
+
+		private static Lrc MergeLyric(Lrc rawLrc, Lrc translatedLrc) {
 			Lrc mergedLrc;
 
 			mergedLrc = new Lrc {

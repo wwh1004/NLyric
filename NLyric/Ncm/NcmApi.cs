@@ -24,17 +24,19 @@ namespace NLyric.Ncm {
 		}
 
 		public static async Task<JToken> SearchAsync(IEnumerable<string> keywords, SearchType type, int limit) {
-			FormUrlEncodedCollection parameters;
+			QueryCollection queries;
 
-			parameters = new FormUrlEncodedCollection {
+			queries = new QueryCollection {
 				{ "s", string.Join(" ", keywords) },
 				{ "type", ((int)type).ToString() },
 				{ "limit", limit.ToString() }
 			};
 			using (HttpClient client = new HttpClient())
-			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, SEARCH_URL, parameters, null)) {
+			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, SEARCH_URL, queries, null)) {
 				JObject json;
 
+				if (!response.IsSuccessStatusCode)
+					throw new HttpRequestException();
 				json = JObject.Parse(await response.Content.ReadAsStringAsync());
 				if ((int)json["code"] != 200)
 					throw new HttpRequestException();
@@ -43,15 +45,17 @@ namespace NLyric.Ncm {
 		}
 
 		public static async Task<JToken> GetAlbumAsync(int id) {
-			FormUrlEncodedCollection parameters;
+			QueryCollection queries;
 
-			parameters = new FormUrlEncodedCollection {
+			queries = new QueryCollection {
 				{ "id", id.ToString() }
 			};
 			using (HttpClient client = new HttpClient())
-			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, ALBUM_URL, parameters, null)) {
+			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, ALBUM_URL, queries, null)) {
 				JObject json;
 
+				if (!response.IsSuccessStatusCode)
+					throw new HttpRequestException();
 				json = JObject.Parse(await response.Content.ReadAsStringAsync());
 				if ((int)json["code"] != 200)
 					throw new HttpRequestException();
@@ -60,17 +64,19 @@ namespace NLyric.Ncm {
 		}
 
 		public static async Task<JToken> GetLyricAsync(int id) {
-			FormUrlEncodedCollection parameters;
+			QueryCollection queries;
 
-			parameters = new FormUrlEncodedCollection {
+			queries = new QueryCollection {
 				{ "id", id.ToString() },
 				{ "lv", "-1" },
 				{ "tv", "-1" }
 			};
 			using (HttpClient client = new HttpClient())
-			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, LYRIC_URL, parameters, null)) {
+			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, LYRIC_URL, queries, null)) {
 				JObject json;
 
+				if (!response.IsSuccessStatusCode)
+					throw new HttpRequestException();
 				json = JObject.Parse(await response.Content.ReadAsStringAsync());
 				if ((int)json["code"] != 200)
 					throw new HttpRequestException();

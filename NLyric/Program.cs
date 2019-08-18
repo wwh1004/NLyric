@@ -8,7 +8,7 @@ using NLyric.Settings;
 namespace NLyric {
 	public static class Program {
 		private static void Main(string[] args) {
-			if (args == null || args.Length == 0) {
+			if (args is null || args.Length == 0) {
 				CommandLine.ShowUsage<Arguments>();
 				return;
 			}
@@ -25,7 +25,7 @@ namespace NLyric {
 				return;
 			}
 			AllSettings.Default = JsonConvert.DeserializeObject<AllSettings>(File.ReadAllText("Settings.json"));
-			CliWorker.ExecuteAsync(arguments).GetAwaiter().GetResult();
+			NLyricImpl.ExecuteAsync(arguments).GetAwaiter().GetResult();
 			Logger.Instance.LogInfo("完成", ConsoleColor.Green);
 #if DEBUG
 			Console.ReadKey(true);

@@ -10,23 +10,38 @@ namespace System.Cli {
 		private string _type;
 		private string _description;
 
+		/// <summary>
+		/// 参数名
+		/// </summary>
 		public string Name => _name;
 
+		/// <summary>
+		/// 是否为必选参数
+		/// </summary>
 		public bool IsRequired {
 			get => _isRequired;
 			set => _isRequired = value;
 		}
 
+		/// <summary>
+		/// 默认值，当 <see cref="IsRequired"/> 为 <see langword="true"/> 时，<see cref="DefaultValue"/> 必须为 <see langword="null"/>。
+		/// </summary>
 		public object DefaultValue {
 			get => _defaultValue;
 			set => _defaultValue = value;
 		}
 
+		/// <summary>
+		/// 参数类型，用于 <see cref="CommandLine.ShowUsage{T}"/> 显示类型来简单描述参数。若应用到返回类型为 <see cref="bool"/> 的属性上，<see cref="Type"/> 必须为 <see langword="null"/>。
+		/// </summary>
 		public string Type {
 			get => _type;
 			set => _type = value;
 		}
 
+		/// <summary>
+		/// 参数介绍，用于 <see cref="CommandLine.ShowUsage{T}"/> 具体描述参数。
+		/// </summary>
 		public string Description {
 			get => _description;
 			set => _description = value;

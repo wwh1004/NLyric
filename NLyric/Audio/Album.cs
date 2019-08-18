@@ -16,9 +16,9 @@ namespace NLyric.Audio {
 		public int? Year => _year;
 
 		public Album(string name, string[] artists, int? trackCount, int? year) {
-			if (name == null)
+			if (name is null)
 				throw new ArgumentNullException(nameof(name));
-			if (artists == null)
+			if (artists is null)
 				throw new ArgumentNullException(nameof(artists));
 
 			_name = name;
@@ -33,7 +33,7 @@ namespace NLyric.Audio {
 		/// <param name="track"></param>
 		/// <param name="getArtistsFromTrack">当 <see cref="Track.AlbumArtist"/> 为空时，是否从 <see cref="Track.Artist"/> 获取艺术家</param>
 		public Album(ATL.Track track, bool getArtistsFromTrack) {
-			if (track == null)
+			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 			if (!HasAlbumInfo(track))
 				throw new ArgumentException(nameof(track) + " 中不存在专辑信息");
@@ -52,7 +52,7 @@ namespace NLyric.Audio {
 		}
 
 		public static bool HasAlbumInfo(ATL.Track track) {
-			if (track == null)
+			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 
 			return !string.IsNullOrWhiteSpace(track.Album);
