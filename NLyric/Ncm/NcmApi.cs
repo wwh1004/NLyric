@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Extensions;
 using System.Net.Http;
@@ -34,13 +35,17 @@ namespace NLyric.Ncm {
 			using (HttpClient client = new HttpClient())
 			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, SEARCH_URL, queries, null)) {
 				JObject json;
+				JToken result;
 
 				if (!response.IsSuccessStatusCode)
 					throw new HttpRequestException();
 				json = JObject.Parse(await response.Content.ReadAsStringAsync());
 				if ((int)json["code"] != 200)
 					throw new HttpRequestException();
-				return json["result"];
+				result = json["result"];
+				if (result is null)
+					throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
+				return result;
 			}
 		}
 
