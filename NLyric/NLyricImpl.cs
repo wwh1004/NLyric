@@ -27,9 +27,11 @@ namespace NLyric {
 		private static AllCaches _allCaches;
 
 		public static async Task ExecuteAsync(Arguments arguments) {
+			Logger.Instance.LogInfo("登录可避免出现大部分API错误！！！", ConsoleColor.Green);
 			Logger.Instance.LogInfo("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
 			Logger.Instance.LogNewLine();
 			_allCachesPath = Path.Combine(arguments.Directory, ".nlyric");
+			await LoginIfNeedAsync();
 			LoadLocalCaches();
 			foreach (string audioPath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string lrcPath;
@@ -49,6 +51,37 @@ namespace NLyric {
 				Logger.Instance.LogNewLine();
 			}
 			SaveLocalCaches();
+		}
+
+		private static async Task LoginIfNeedAsync() {
+			do {
+				string userInput;
+
+				Logger.Instance.LogInfo("如果需要登录，请输入Y，反之输入N");
+				userInput = Console.ReadLine().Trim().ToUpperInvariant();
+				if (userInput == "Y") {
+					string account;
+					string password;
+
+					Console.WriteLine("请输入账号");
+					account = Console.ReadLine();
+					Console.WriteLine("请输入密码");
+					password = Console.ReadLine();
+					if (await CloudMusic.LoginAsync(account, password)) {
+						Logger.Instance.LogInfo("登录成功", ConsoleColor.Green);
+						Logger.Instance.LogNewLine();
+						break;
+					}
+					else {
+						Logger.Instance.LogError("登录失败，请重试");
+						Logger.Instance.LogNewLine();
+					}
+				}
+				else if (userInput == "N")
+					break;
+				else
+					Logger.Instance.LogWarning("输入有误，请重新输入！");
+			} while (true);
 		}
 
 		private static bool CanSkip(string audioPath, string lrcPath) {

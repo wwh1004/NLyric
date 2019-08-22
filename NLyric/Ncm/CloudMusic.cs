@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NeteaseCloudMusicApi;
 using Newtonsoft.Json.Linq;
@@ -10,6 +11,19 @@ using NLyric.Lyrics;
 namespace NLyric.Ncm {
 	public static class CloudMusic {
 		private static readonly CloudMusicApi _api = new CloudMusicApi();
+
+		public static async Task<bool> LoginAsync(string account, string password) {
+			Dictionary<string, string> queries;
+			bool isPhone;
+			bool isOk;
+
+			queries = new Dictionary<string, string>();
+			isPhone = Regex.Match(account, "^[0-9]+$").Success;
+			queries[isPhone ? "phone" : "email"] = account;
+			queries["password"] = password;
+			(isOk, _) = await _api.RequestAsync(isPhone ? CloudMusicApiProviders.LoginCellphone : CloudMusicApiProviders.Login, queries);
+			return isOk;
+		}
 
 		public static async Task<NcmTrack[]> SearchTrackAsync(Track track, int limit, bool withArtists) {
 			List<string> keywords;
@@ -34,7 +48,7 @@ namespace NLyric.Ncm {
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
 			json = (JObject)json["result"];
 			if (json is null)
-				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
+				throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
 			if ((int)json["songCount"] == 0)
 				return Array.Empty<NcmTrack>();
 			return ((JArray)json["songs"]).Select(t => ParseTrack(t, false)).ToArray();
@@ -63,7 +77,7 @@ namespace NLyric.Ncm {
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
 			json = (JObject)json["result"];
 			if (json is null)
-				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
+				throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
 			if ((int)json["albumCount"] == 0)
 				return Array.Empty<NcmAlbum>();
 			return ((JArray)json["albums"]).Select(t => ParseAlbum(t)).ToArray();
