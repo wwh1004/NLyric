@@ -24,7 +24,7 @@ namespace NLyric.Ncm {
 			json = await NcmApi.SearchAsync(keywords, NcmApi.SearchType.Track, limit);
 			if ((int)json["songCount"] == 0)
 				return Array.Empty<NcmTrack>();
-			return ((JArray)json["songs"]).Select(t => ParseTrack(t, false)).ToArray();
+			return ((JArray)json["songs"]).Select(ParseTrack).ToArray();
 		}
 
 		public static async Task<NcmAlbum[]> SearchAlbumAsync(Album album, int limit, bool withArtists) {
@@ -50,7 +50,7 @@ namespace NLyric.Ncm {
 			JToken json;
 
 			json = await NcmApi.GetAlbumAsync(albumId);
-			return ((JArray)json["songs"]).Select(t => ParseTrack(t, true)).ToArray();
+			return ((JArray)json["album"]["songs"]).Select(ParseTrack).ToArray();
 		}
 
 		public static async Task<NcmLyric> GetLyricAsync(int trackId) {
@@ -81,11 +81,11 @@ namespace NLyric.Ncm {
 			return ncmAlbum;
 		}
 
-		private static NcmTrack ParseTrack(JToken json, bool fromAlbumDetail) {
+		private static NcmTrack ParseTrack(JToken json) {
 			Track track;
 			NcmTrack ncmTrack;
 
-			track = new Track((string)json["name"], ParseNames((JArray)json[fromAlbumDetail ? "ar" : "artists"]));
+			track = new Track((string)json["name"], ParseNames((JArray)json["artists"]));
 			ncmTrack = new NcmTrack(track, (int)json["id"]);
 			return ncmTrack;
 		}

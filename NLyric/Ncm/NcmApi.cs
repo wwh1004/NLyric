@@ -10,7 +10,7 @@ namespace NLyric.Ncm {
 	/// </summary>
 	public static class NcmApi {
 		private const string SEARCH_URL = "http://music.163.com/api/search/pc";
-		private const string ALBUM_URL = "http://musicapi.leanapp.cn/album";
+		private const string ALBUM_URL = "http://music.163.com/api/album";
 		private const string LYRIC_URL = "http://music.163.com/api/song/lyric";
 
 		/// <summary>
@@ -45,13 +45,8 @@ namespace NLyric.Ncm {
 		}
 
 		public static async Task<JToken> GetAlbumAsync(int id) {
-			QueryCollection queries;
-
-			queries = new QueryCollection {
-				{ "id", id.ToString() }
-			};
 			using (HttpClient client = new HttpClient())
-			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, ALBUM_URL, queries, null)) {
+			using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, ALBUM_URL + "/" + id.ToString())) {
 				JObject json;
 
 				if (!response.IsSuccessStatusCode)
