@@ -69,7 +69,6 @@ namespace NLyric {
 					password = Console.ReadLine();
 					if (await CloudMusic.LoginAsync(account, password)) {
 						Logger.Instance.LogInfo("登录成功", ConsoleColor.Green);
-						Logger.Instance.LogNewLine();
 						break;
 					}
 					else {
@@ -82,6 +81,7 @@ namespace NLyric {
 				else
 					Logger.Instance.LogWarning("输入有误，请重新输入！");
 			} while (true);
+			Logger.Instance.LogNewLine();
 		}
 
 		private static bool CanSkip(string audioPath, string lrcPath) {
@@ -445,6 +445,7 @@ namespace NLyric {
 			if (sources.Length == 0)
 				return null;
 			result = MatchByUser(sources, target, false);
+
 			if (result is null && _fuzzySettings.TryIgnoringExtraInfo)
 				result = MatchByUser(sources, target, true);
 			return result;
@@ -453,41 +454,48 @@ namespace NLyric {
 		private static TSource MatchByUser<TSource, TTarget>(TSource[] sources, TTarget target, bool fuzzy) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
 			Dictionary<TSource, double> nameSimilarities;
 			TSource result;
-			bool isExact;
 
 			if (sources.Length == 0)
 				return null;
+			result = MatchExactly(sources, target, fuzzy);
+			if (!fuzzy || !(result is null))
+				// 不是fuzzy模式或者result不为空，可以直接返回结果，不需要用户选择了
+				return result;
 			nameSimilarities = new Dictionary<TSource, double>();
 			foreach (TSource source in sources)
 				nameSimilarities[source] = ComputeSimilarity(source.Name, target.Name, fuzzy);
-			result = Match(sources, target, nameSimilarities, out isExact);
-			if (isExact)
-				// 自动匹配成功，如果是完全匹配，不需要用户再次确认
-				return result;
-			return fuzzy ? Select(sources.Where(t => nameSimilarities[t] > _matchSettings.MinimumSimilarityUser).OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities) : null;
-			// fuzzy为true时是第二次搜索了，再让用户再次手动从搜索结果中选择，自动匹配失败的原因可能是 Settings.Match.MinimumSimilarity 设置太大了
+			return Select(sources.Where(t => nameSimilarities[t] > _matchSettings.MinimumSimilarity).OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities);
 		}
 
-		private static TSource Match<TSource, TTarget>(TSource[] sources, TTarget target, Dictionary<TSource, double> nameSimilarities, out bool isExact) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
+		private static TSource MatchExactly<TSource, TTarget>(TSource[] sources, TTarget target, bool fuzzy) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
 			foreach (TSource source in sources) {
-				double nameSimilarity;
+				string x;
+				string y;
 
-				nameSimilarity = nameSimilarities[source];
-				if (nameSimilarity < _matchSettings.MinimumSimilarityAuto)
-					continue;
-				foreach (string ncmArtist in source.Artists)
-					foreach (string artist in target.Artists)
-						if (ComputeSimilarity(ncmArtist, artist, false) >= _matchSettings.MinimumSimilarityAuto) {
-							Logger.Instance.LogInfo(
-								"自动匹配结果：" + Environment.NewLine +
-								"网易云音乐：" + source.ToString() + Environment.NewLine +
-								"本地：" + target.ToString() + Environment.NewLine +
-								"相似度：" + nameSimilarity.ToString());
-							isExact = nameSimilarity == 1;
-							return source;
-						}
+				x = source.Name;
+				y = target.Name;
+				if (fuzzy) {
+					x = x.Fuzzy();
+					y = y.Fuzzy();
+				}
+				if (x != y)
+					goto not_equal;
+				if (source.Artists.Length != target.Artists.Length)
+					goto not_equal;
+				for (int i = 0; i < source.Artists.Length; i++) {
+					x = source.Artists[i];
+					y = target.Artists[i];
+					if (fuzzy) {
+						x = x.Fuzzy();
+						y = y.Fuzzy();
+					}
+					if (x != y)
+						goto not_equal;
+				}
+				return source;
+			not_equal:
+				continue;
 			}
-			isExact = false;
 			return null;
 		}
 
