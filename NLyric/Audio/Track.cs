@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Linq;
 
 namespace NLyric.Audio {
 	public class Track : ITrackOrAlbum {
@@ -17,7 +17,7 @@ namespace NLyric.Audio {
 				throw new ArgumentNullException(nameof(artists));
 
 			_name = name;
-			_artists = artists;
+			_artists = artists.Select(t => t.Trim()).ToArray();
 		}
 
 		public Track(ATL.Track track) {
@@ -26,24 +26,11 @@ namespace NLyric.Audio {
 
 			_name = track.Title.GetSafeString();
 			_artists = track.Artist.GetSafeString().SplitEx();
-			Array.Sort(_artists, StringComparer.Instance);
+			Array.Sort(_artists, StringHelper.OrdinalComparer);
 		}
 
 		public override string ToString() {
 			return "Name:" + _name + " | Artists:" + string.Join(",", _artists);
-		}
-
-		private sealed class StringComparer : IComparer<string> {
-			private static readonly StringComparer _instance = new StringComparer();
-
-			public static StringComparer Instance => _instance;
-
-			private StringComparer() {
-			}
-
-			public int Compare(string x, string y) {
-				return string.CompareOrdinal(x, y);
-			}
 		}
 	}
 }

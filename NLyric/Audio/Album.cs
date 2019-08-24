@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace NLyric.Audio {
 	public class Album : ITrackOrAlbum {
@@ -22,7 +23,7 @@ namespace NLyric.Audio {
 				throw new ArgumentNullException(nameof(artists));
 
 			_name = name;
-			_artists = artists;
+			_artists = artists.Select(t => t.Trim()).ToArray();
 			_trackCount = trackCount;
 			_year = year;
 		}

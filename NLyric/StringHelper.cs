@@ -11,6 +11,11 @@ namespace NLyric {
 		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
 
 		/// <summary>
+		/// 二进制比较器
+		/// </summary>
+		public static IComparer<string> OrdinalComparer => StringOrdinalComparer.Instance;
+
+		/// <summary>
 		/// 获取非空字符串，并且清楚首尾空格
 		/// </summary>
 		/// <param name="value"></param>
@@ -122,6 +127,19 @@ namespace NLyric {
 					chars[i] = (char)(chars[i] - 0xFEE0);
 			}
 			return new string(chars);
+		}
+
+		private sealed class StringOrdinalComparer : IComparer<string> {
+			private static readonly StringOrdinalComparer _instance = new StringOrdinalComparer();
+
+			public static StringOrdinalComparer Instance => _instance;
+
+			private StringOrdinalComparer() {
+			}
+
+			public int Compare(string x, string y) {
+				return string.CompareOrdinal(x, y);
+			}
 		}
 	}
 }

@@ -361,22 +361,33 @@ namespace NLyric {
 		private static void LoadLocalCaches() {
 			if (File.Exists(_allCachesPath)) {
 				_allCaches = JsonConvert.DeserializeObject<AllCaches>(File.ReadAllText(_allCachesPath));
+				NormalizeAllCaches();
 				Logger.Instance.LogInfo($"搜索缓存\"{_allCachesPath}\"加载成功。");
 			}
-			else
+			else {
 				_allCaches = new AllCaches() {
 					AlbumCaches = new List<AlbumCache>(),
 					LyricCaches = new List<LyricCache>(),
 					TrackCaches = new List<TrackCache>()
 				};
+			}
 		}
 
 		private static void SaveLocalCaches() {
-			_allCaches.AlbumCaches.Sort((x, y) => x.Name.CompareTo(y.Name));
-			_allCaches.TrackCaches.Sort((x, y) => x.Name.CompareTo(y.Name));
-			_allCaches.LyricCaches.Sort((x, y) => x.Id.CompareTo(y.Id));
+			NormalizeAllCaches();
 			SaveLocalCachesCore(_allCachesPath);
 			Logger.Instance.LogInfo($"搜索缓存\"{_allCachesPath}\"已被保存。");
+		}
+
+		private static void NormalizeAllCaches() {
+			_allCaches.AlbumCaches.Sort((x, y) => string.CompareOrdinal(x.Name, y.Name));
+			_allCaches.TrackCaches.Sort((x, y) => string.CompareOrdinal(x.Name, y.Name));
+			_allCaches.LyricCaches.Sort((x, y) => x.Id.CompareTo(y.Id));
+			foreach (TrackCache cache in _allCaches.TrackCaches) {
+				for (int i = 0; i < cache.Artists.Length; i++)
+					cache.Artists[i] = cache.Artists[i].Trim();
+				Array.Sort(cache.Artists, StringHelper.OrdinalComparer);
+			}
 		}
 
 		private static void SaveLocalCachesCore(string cachePath) {
