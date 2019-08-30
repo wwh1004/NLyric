@@ -27,7 +27,10 @@ namespace NLyric {
 		private static AllCaches _allCaches;
 
 		public static async Task ExecuteAsync(Arguments arguments) {
-			Logger.Instance.LogInfo("登录可避免出现大部分API错误！！！", ConsoleColor.Green);
+			for (int i = 0; i < 3; i++)
+				Logger.Instance.LogInfo("登录可避免出现大部分API错误！！！软件出错请尝试登录！！！", ConsoleColor.Green);
+			Logger.Instance.LogInfo("重要的事情说3遍！！！", ConsoleColor.Green);
+			Logger.Instance.LogNewLine();
 			Logger.Instance.LogInfo("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
 			Logger.Instance.LogNewLine();
 			_allCachesPath = Path.Combine(arguments.Directory, ".nlyric");
