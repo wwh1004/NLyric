@@ -2,11 +2,11 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace NLyric {
 	/// <summary>
-	/// 通过163Key直接获取歌曲ID，
-	/// 代码来自我原来的项目： https://github.com/wwh1004/netease-cloudmusic-lyrics-downloader
+	/// 通过163Key直接获取歌曲ID
 	/// </summary>
 	internal static class The163KeyHelper {
 		private static readonly byte[] _163Start = Encoding.UTF8.GetBytes("163 key(Don't modify):");
@@ -71,19 +71,9 @@ namespace NLyric {
 
 		private static int GetMusicId(byte[] byt163Key) {
 			byt163Key = Convert.FromBase64String(Encoding.UTF8.GetString(byt163Key));
-			byt163Key = _aes.CreateDecryptor().TransformFinalBlock(byt163Key, 0, byt163Key.Length);
-			return int.Parse(Encoding.UTF8.GetString(byt163Key, 17, GetIndex(byt163Key, 0x2C, 17) - 17));
-		}
-
-		private static int GetIndex(byte[] src, byte dest, int startIndex) {
-			return GetIndex(src, dest, startIndex, src.Length - 1);
-		}
-
-		private static int GetIndex(byte[] src, byte dest, int startIndex, int endIndex) {
-			for (int i = startIndex; i < endIndex + 1; i++)
-				if (src[i] == dest)
-					return i;
-			return -1;
+			using (ICryptoTransform cryptoTransform = _aes.CreateDecryptor())
+				byt163Key = cryptoTransform.TransformFinalBlock(byt163Key, 0, byt163Key.Length);
+			return (int)JObject.Parse(Encoding.UTF8.GetString(byt163Key).Substring(6))["musicId"];
 		}
 
 		private static int GetIndex(byte[] src, byte[] dest, int startIndex) {
