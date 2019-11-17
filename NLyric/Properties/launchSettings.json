@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "NLyric": {
-      "commandName": "Project",
-      "commandLineArgs": "-d \"G:\\Music\""
-    }
-  }
-}
