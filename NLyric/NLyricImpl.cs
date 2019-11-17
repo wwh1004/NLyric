@@ -62,7 +62,11 @@ namespace NLyric {
 					Logger.Instance.LogInfo("登录成功！", ConsoleColor.Green);
 				else {
 					Logger.Instance.LogError("登录失败，输入任意键以免登录模式运行或重新运行尝试再次登录！");
-					Console.ReadKey();
+					try {
+						Console.ReadKey(true);
+					}
+					catch {
+					}
 				}
 			}
 			Logger.Instance.LogNewLine();
