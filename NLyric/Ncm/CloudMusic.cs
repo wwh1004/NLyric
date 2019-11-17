@@ -31,6 +31,7 @@ namespace NLyric.Ncm {
 			List<string> keywords;
 			bool isOk;
 			JObject json;
+			JArray songs;
 
 			keywords = new List<string>();
 			if (track.Name.Length != 0)
@@ -57,15 +58,17 @@ namespace NLyric.Ncm {
 			json = (JObject)json["result"];
 			if (json is null)
 				throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
-			if ((int)json["songCount"] == 0)
+			songs = json["songs"] as JArray;
+			if (songs is null)
 				return Array.Empty<NcmTrack>();
-			return json["songs"].Select(t => ParseTrack(t, false)).ToArray();
+			return songs.Select(t => ParseTrack(t, false)).ToArray();
 		}
 
 		public static async Task<NcmAlbum[]> SearchAlbumAsync(Album album, int limit, bool withArtists) {
 			List<string> keywords;
 			bool isOk;
 			JObject json;
+			JArray albums;
 
 			keywords = new List<string>();
 			if (album.Name.Length != 0)
@@ -92,9 +95,11 @@ namespace NLyric.Ncm {
 			json = (JObject)json["result"];
 			if (json is null)
 				throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
-			if ((int)json["albumCount"] == 0)
+			albums = json["albums"] as JArray;
+			if (albums is null)
 				return Array.Empty<NcmAlbum>();
-			return json["albums"].Select(t => ParseAlbum(t)).ToArray();
+			// albumCount不可信，搜索"U-87 陈奕迅"返回albums有内容，但是albumCount为0
+			return albums.Select(t => ParseAlbum(t)).ToArray();
 		}
 
 		public static async Task<NcmTrack[]> GetTracksAsync(int albumId) {
