@@ -48,6 +48,7 @@ namespace NLyric {
 				Logger.Instance.LogNewLine();
 			}
 			SaveLocalCaches();
+			File.SetAttributes(_allCachesPath, FileAttributes.Hidden);
 		}
 
 		private static async Task LoginIfNeedAsync(Arguments arguments) {
@@ -379,17 +380,7 @@ namespace NLyric {
 		}
 
 		private static void SaveLocalCachesCore(string cachePath) {
-			File.WriteAllText(cachePath, FormatJson(JsonConvert.SerializeObject(_allCaches)));
-		}
-
-		private static string FormatJson(string json) {
-			using (StringWriter writer = new StringWriter())
-			using (JsonTextWriter jsonWriter = new JsonTextWriter(writer) { Formatting = Formatting.Indented })
-			using (StringReader reader = new StringReader(json))
-			using (JsonTextReader jsonReader = new JsonTextReader(reader)) {
-				jsonWriter.WriteToken(jsonReader);
-				return writer.ToString();
-			}
+			File.WriteAllText(cachePath, JsonConvert.SerializeObject(_allCaches));
 		}
 
 		private static void UpdateCache(Album album, int id) {
