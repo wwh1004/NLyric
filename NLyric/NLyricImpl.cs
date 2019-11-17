@@ -27,14 +27,8 @@ namespace NLyric {
 		private static AllCaches _allCaches;
 
 		public static async Task ExecuteAsync(Arguments arguments) {
-			for (int i = 0; i < 3; i++)
-				Logger.Instance.LogInfo("登录可避免出现大部分API错误！！！软件出错请尝试登录！！！", ConsoleColor.Green);
-			Logger.Instance.LogInfo("重要的事情说3遍！！！", ConsoleColor.Green);
-			Logger.Instance.LogNewLine();
-			Logger.Instance.LogInfo("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
-			Logger.Instance.LogNewLine();
+			await LoginIfNeedAsync(arguments);
 			_allCachesPath = Path.Combine(arguments.Directory, ".nlyric");
-			await LoginIfNeedAsync();
 			LoadLocalCaches();
 			foreach (string audioPath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string lrcPath;
@@ -56,34 +50,21 @@ namespace NLyric {
 			SaveLocalCaches();
 		}
 
-		private static async Task LoginIfNeedAsync() {
-			do {
-				string userInput;
-
-				Logger.Instance.LogInfo("如果需要登录，请输入Y，反之输入N");
-				userInput = Console.ReadLine().Trim().ToUpperInvariant();
-				if (userInput == "Y") {
-					string account;
-					string password;
-
-					Console.WriteLine("请输入账号");
-					account = Console.ReadLine();
-					Console.WriteLine("请输入密码");
-					password = Console.ReadLine();
-					if (await CloudMusic.LoginAsync(account, password)) {
-						Logger.Instance.LogInfo("登录成功", ConsoleColor.Green);
-						break;
-					}
-					else {
-						Logger.Instance.LogError("登录失败，请重试");
-						Logger.Instance.LogNewLine();
-					}
+		private static async Task LoginIfNeedAsync(Arguments arguments) {
+			if (string.IsNullOrEmpty(arguments.Account) || string.IsNullOrEmpty(arguments.Password)) {
+				for (int i = 0; i < 3; i++)
+					Logger.Instance.LogInfo("登录可避免出现大部分API错误！！！当前是免登录状态，若软件出错请尝试登录！！！", ConsoleColor.Green);
+				Logger.Instance.LogInfo("强烈建议登录使用软件：\"NLyric.exe -d C:\\Music -a example@example.com -p 123456\"", ConsoleColor.Green);
+			}
+			else {
+				Logger.Instance.LogInfo("登录中...", ConsoleColor.Green);
+				if (await CloudMusic.LoginAsync(arguments.Account, arguments.Password))
+					Logger.Instance.LogInfo("登录成功！", ConsoleColor.Green);
+				else {
+					Logger.Instance.LogError("登录失败，输入任意键以免登录模式运行或重新运行尝试再次登录！");
+					Console.ReadKey();
 				}
-				else if (userInput == "N")
-					break;
-				else
-					Logger.Instance.LogWarning("输入有误，请重新输入！");
-			} while (true);
+			}
 			Logger.Instance.LogNewLine();
 		}
 
@@ -518,7 +499,7 @@ namespace NLyric {
 
 			if (sources.Length == 0)
 				return null;
-			Logger.Instance.LogInfo("请手动输入1,2,3...选择匹配的项，若不存在，请输入Pass。");
+			Logger.Instance.LogInfo("请手动输入1,2,3...选择匹配的项，若不存在，请输入P。");
 			Logger.Instance.LogInfo("对比项：" + TrackOrAlbumToString(target));
 			for (int i = 0; i < sources.Length; i++) {
 				double nameSimilarity;
@@ -539,7 +520,7 @@ namespace NLyric {
 				int index;
 
 				userInput = Console.ReadLine().Trim();
-				if (userInput.ToUpperInvariant() == "PASS")
+				if (userInput.ToUpperInvariant() == "P")
 					break;
 				if (int.TryParse(userInput, out index)) {
 					index -= 1;
