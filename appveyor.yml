@@ -1,5 +1,5 @@
 version: '{build}'
-image: Visual Studio 2019 Preview
+image: Visual Studio 2019
 configuration: Release
 platform: Any CPU
 before_build:
@@ -8,7 +8,7 @@ build:
   project: NLyric.sln
   verbosity: normal
 after_build:
-- cmd: dotnet publish NLyric.sln -c Release -f netcoreapp2.1
+- cmd: dotnet publish NLyric\NLyric.csproj -c Release -f netcoreapp2.1
 artifacts:
 - path: bin\Release\net472
   name: NLyric-net472
