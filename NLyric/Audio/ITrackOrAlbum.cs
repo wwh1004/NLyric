@@ -1,7 +1,9 @@
+using System.Collections.Generic;
+
 namespace NLyric.Audio {
 	public interface ITrackOrAlbum {
 		string Name { get; }
 
-		string[] Artists { get; }
+		IReadOnlyList<string> Artists { get; }
 	}
 }

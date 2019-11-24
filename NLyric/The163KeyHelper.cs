@@ -1,97 +1,62 @@
 using System;
-using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json.Linq;
+using TagLib;
 
 namespace NLyric {
 	/// <summary>
 	/// 通过163Key直接获取歌曲ID
 	/// </summary>
 	internal static class The163KeyHelper {
-		private static readonly byte[] _163Start = Encoding.UTF8.GetBytes("163 key(Don't modify):");
-		private static readonly byte[] _163EndMp3 = { 0x54, 0x41, 0x4C, 0x42 };
-		private static readonly byte[] _163EndFlac = { 0x0, 0x0, 0x0, 0x45 };
-		private static readonly Aes _aes;
+		private static readonly Aes _aes = Create163Aes();
 
-		static The163KeyHelper() {
-			_aes = Aes.Create();
-			_aes.BlockSize = 128;
-			_aes.Key = Encoding.UTF8.GetBytes(@"#14ljk_!\]&0U<'(");
-			_aes.Mode = CipherMode.ECB;
-			_aes.Padding = PaddingMode.PKCS7;
+		private static Aes Create163Aes() {
+			Aes aes;
+
+			aes = Aes.Create();
+			aes.BlockSize = 128;
+			aes.Key = Encoding.UTF8.GetBytes(@"#14ljk_!\]&0U<'(");
+			aes.Mode = CipherMode.ECB;
+			aes.Padding = PaddingMode.PKCS7;
+			return aes;
 		}
 
-		public static bool TryGetMusicId(string filePath, out int trackId) {
-			string extension;
-			byte[] byt163Key;
+		/// <summary>
+		/// 尝试获取网易云音乐ID
+		/// </summary>
+		/// <param name="tag"></param>
+		/// <param name="trackId"></param>
+		/// <returns></returns>
+		public static bool TryGetTrackId(Tag tag, out int trackId) {
+			if (tag is null)
+				throw new ArgumentNullException(nameof(tag));
 
-			extension = Path.GetExtension(filePath);
-			switch (extension.ToUpperInvariant()) {
-			case ".FLAC":
-				byt163Key = Get163Key(filePath, false);
-				break;
-			case ".MP3":
-				byt163Key = Get163Key(filePath, true);
-				break;
-			default:
-				byt163Key = null;
-				break;
+			string the163Key;
+
+			trackId = 0;
+			the163Key = tag.Comment;
+			if (!Is163KeyCandidate(the163Key))
+				the163Key = tag.Description;
+			if (!Is163KeyCandidate(the163Key))
+				return false;
+			try {
+				byte[] byt163Key;
+
+				the163Key = the163Key.Substring(22);
+				byt163Key = Convert.FromBase64String(the163Key);
+				using (ICryptoTransform cryptoTransform = _aes.CreateDecryptor())
+					byt163Key = cryptoTransform.TransformFinalBlock(byt163Key, 0, byt163Key.Length);
+				trackId = (int)JObject.Parse(Encoding.UTF8.GetString(byt163Key).Substring(6))["musicId"];
 			}
-			if (byt163Key is null) {
-				trackId = 0;
+			catch {
 				return false;
 			}
-			trackId = GetMusicId(byt163Key);
 			return true;
 		}
 
-		private static byte[] Get163Key(string filePath, bool isMp3) {
-			byte[] bytFile;
-			int startIndex;
-			int endIndex;
-			byte[] byt163Key;
-
-			bytFile = new byte[0x4000];
-			using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-				stream.Read(bytFile, 0, bytFile.Length);
-			startIndex = GetIndex(bytFile, _163Start, 0);
-			if (startIndex == -1)
-				return null;
-			if (isMp3)
-				endIndex = GetIndex(bytFile, _163EndMp3, startIndex);
-			else
-				endIndex = GetIndex(bytFile, _163EndFlac, startIndex) - 1;
-			if (endIndex == -1)
-				return null;
-			byt163Key = new byte[endIndex - startIndex - _163Start.Length];
-			Buffer.BlockCopy(bytFile, startIndex + _163Start.Length, byt163Key, 0, byt163Key.Length);
-			return byt163Key;
-		}
-
-		private static int GetMusicId(byte[] byt163Key) {
-			byt163Key = Convert.FromBase64String(Encoding.UTF8.GetString(byt163Key));
-			using (ICryptoTransform cryptoTransform = _aes.CreateDecryptor())
-				byt163Key = cryptoTransform.TransformFinalBlock(byt163Key, 0, byt163Key.Length);
-			return (int)JObject.Parse(Encoding.UTF8.GetString(byt163Key).Substring(6))["musicId"];
-		}
-
-		private static int GetIndex(byte[] src, byte[] dest, int startIndex) {
-			return GetIndex(src, dest, startIndex, src.Length - dest.Length);
-		}
-
-		private static int GetIndex(byte[] src, byte[] dest, int startIndex, int endIndex) {
-			int j;
-
-			for (int i = startIndex; i < endIndex + 1; i++)
-				if (src[i] == dest[0]) {
-					for (j = 1; j < dest.Length; j++)
-						if (src[i + j] != dest[j])
-							break;
-					if (j == dest.Length)
-						return i;
-				}
-			return -1;
+		private static bool Is163KeyCandidate(string s) {
+			return !string.IsNullOrEmpty(s) && s.StartsWith("163 key(Don't modify):", StringComparison.Ordinal);
 		}
 	}
 }

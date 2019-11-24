@@ -1,22 +1,27 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using TagLib;
 
 namespace NLyric.Audio {
+	/// <summary>
+	/// 专辑
+	/// </summary>
 	public class Album : ITrackOrAlbum {
 		private readonly string _name;
 		private readonly string[] _artists;
-		private readonly int? _trackCount;
-		private readonly int? _year;
 
+		/// <summary>
+		/// 名称
+		/// </summary>
 		public string Name => _name;
 
-		public string[] Artists => _artists;
+		/// <summary>
+		/// 艺术家
+		/// </summary>
+		public IReadOnlyList<string> Artists => _artists;
 
-		public int? TrackCount => _trackCount;
-
-		public int? Year => _year;
-
-		public Album(string name, string[] artists, int? trackCount, int? year) {
+		public Album(string name, IEnumerable<string> artists) {
 			if (name is null)
 				throw new ArgumentNullException(nameof(name));
 			if (artists is null)
@@ -24,43 +29,44 @@ namespace NLyric.Audio {
 
 			_name = name;
 			_artists = artists.Select(t => t.Trim()).ToArray();
-			_trackCount = trackCount;
-			_year = year;
+			Array.Sort(_artists, StringHelper.OrdinalComparer);
 		}
 
 		/// <summary>
 		/// 构造器
 		/// </summary>
-		/// <param name="track"></param>
+		/// <param name="tag"></param>
 		/// <param name="getArtistsFromTrack">当 <see cref="Track.AlbumArtist"/> 为空时，是否从 <see cref="Track.Artist"/> 获取艺术家</param>
-		public Album(ATL.Track track, bool getArtistsFromTrack) {
-			if (track is null)
-				throw new ArgumentNullException(nameof(track));
-			if (!HasAlbumInfo(track))
-				throw new ArgumentException(nameof(track) + " 中不存在专辑信息");
+		public Album(Tag tag, bool getArtistsFromTrack) {
+			if (tag is null)
+				throw new ArgumentNullException(nameof(tag));
+			if (!HasAlbumInfo(tag))
+				throw new ArgumentException(nameof(tag) + " 中不存在专辑信息");
 
-			string artists;
+			string[] artists;
 
-			_name = track.Album.GetSafeString();
-			artists = track.AlbumArtist.GetSafeString();
+			_name = tag.Album.GetSafeString();
+			artists = tag.AlbumArtists.SelectMany(t => t.GetSafeString().SplitEx()).ToArray();
 			if (getArtistsFromTrack && artists.Length == 0)
-				artists = track.Artist.GetSafeString();
-			_artists = artists.Length == 0 ? Array.Empty<string>() : artists.SplitEx();
-			if (track.TrackTotal != 0)
-				_trackCount = track.TrackTotal;
-			if (track.Year != 0)
-				_year = track.Year;
+				artists = tag.Performers.SelectMany(t => t.GetSafeString().SplitEx()).ToArray();
+			Array.Sort(artists, StringHelper.OrdinalComparer);
+			_artists = artists;
 		}
 
-		public static bool HasAlbumInfo(ATL.Track track) {
-			if (track is null)
-				throw new ArgumentNullException(nameof(track));
+		/// <summary>
+		/// 是否存在专辑信息
+		/// </summary>
+		/// <param name="tag"></param>
+		/// <returns></returns>
+		public static bool HasAlbumInfo(Tag tag) {
+			if (tag is null)
+				throw new ArgumentNullException(nameof(tag));
 
-			return !string.IsNullOrWhiteSpace(track.Album);
+			return !string.IsNullOrWhiteSpace(tag.Album);
 		}
 
 		public override string ToString() {
-			return "Name:" + _name + " | Artists:" + string.Join(",", _artists) + " | TrackCount:" + _trackCount.ToString() + " | Year:" + _year.ToString();
+			return "Name:" + _name + " | Artists:" + string.Join(",", _artists);
 		}
 	}
 }

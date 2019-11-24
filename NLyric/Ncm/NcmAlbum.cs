@@ -6,7 +6,7 @@ namespace NLyric.Ncm {
 
 		public int Id => _id;
 
-		public NcmAlbum(Album album, int id) : base(album.Name, album.Artists, album.TrackCount, album.Year) {
+		public NcmAlbum(Album album, int id) : base(album.Name, album.Artists) {
 			_id = id;
 		}
 

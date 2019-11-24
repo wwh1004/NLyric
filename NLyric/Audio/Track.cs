@@ -1,16 +1,27 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using TagLib;
 
 namespace NLyric.Audio {
+	/// <summary>
+	/// 单曲
+	/// </summary>
 	public class Track : ITrackOrAlbum {
 		private readonly string _name;
 		private readonly string[] _artists;
 
+		/// <summary>
+		/// 名称
+		/// </summary>
 		public string Name => _name;
 
-		public string[] Artists => _artists;
+		/// <summary>
+		/// 艺术家
+		/// </summary>
+		public IReadOnlyList<string> Artists => _artists;
 
-		public Track(string name, string[] artists) {
+		public Track(string name, IEnumerable<string> artists) {
 			if (name is null)
 				throw new ArgumentNullException(nameof(name));
 			if (artists is null)
@@ -18,14 +29,15 @@ namespace NLyric.Audio {
 
 			_name = name;
 			_artists = artists.Select(t => t.Trim()).ToArray();
+			Array.Sort(_artists, StringHelper.OrdinalComparer);
 		}
 
-		public Track(ATL.Track track) {
-			if (track is null)
-				throw new ArgumentNullException(nameof(track));
+		public Track(Tag tag) {
+			if (tag is null)
+				throw new ArgumentNullException(nameof(tag));
 
-			_name = track.Title.GetSafeString();
-			_artists = track.Artist.GetSafeString().SplitEx();
+			_name = tag.Title.GetSafeString();
+			_artists = tag.Performers.SelectMany(s => s.GetSafeString().SplitEx()).ToArray();
 			Array.Sort(_artists, StringHelper.OrdinalComparer);
 		}
 

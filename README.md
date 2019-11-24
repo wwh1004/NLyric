@@ -118,7 +118,7 @@ Windows用户专属GUI。
 		], // 歌词模式，依次尝试每一个模式直到成功，Merged表示混合未翻译和翻译后歌词，Raw表示未翻译的歌词，Translated表示翻译后的歌词
 		"SimplifyTranslated": true, // 部分翻译后的歌词是繁体的，这个选项可以简体化翻译后的歌词
 		"AutoUpdate": true, // 是否自动更新由NLyric创建的歌词
-		"Overwriting": false // 是否覆盖非NLyric创建的歌词
+		"Overwriting": true // 是否覆盖非NLyric创建的歌词
 	}
 }
 ```

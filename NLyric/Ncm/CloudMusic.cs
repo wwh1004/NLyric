@@ -57,7 +57,7 @@ namespace NLyric.Ncm {
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
 			json = (JObject)json["result"];
 			if (json is null)
-				throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
+				throw new KeywordForbiddenException(string.Join(" ", keywords));
 			songs = json["songs"] as JArray;
 			if (songs is null)
 				return Array.Empty<NcmTrack>();
@@ -94,7 +94,7 @@ namespace NLyric.Ncm {
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
 			json = (JObject)json["result"];
 			if (json is null)
-				throw new ArgumentException($"\"{string.Join(" ", keywords)}\" 中有关键词被屏蔽");
+				throw new KeywordForbiddenException(string.Join(" ", keywords));
 			albums = json["albums"] as JArray;
 			if (albums is null)
 				return Array.Empty<NcmAlbum>();
@@ -156,7 +156,7 @@ namespace NLyric.Ncm {
 			Album album;
 			NcmAlbum ncmAlbum;
 
-			album = new Album((string)json["name"], ParseNames(json["artists"]), (int)json["size"], TimeStampToDateTime((long)json["publishTime"]).Year);
+			album = new Album((string)json["name"], ParseNames(json["artists"]));
 			ncmAlbum = new NcmAlbum(album, (int)json["id"]);
 			return ncmAlbum;
 		}
@@ -183,10 +183,6 @@ namespace NLyric.Ncm {
 			lrc = string.IsNullOrEmpty(lyric) ? null : Lrc.UnsafeParse(lyric);
 			version = (int)json["version"];
 			return (lrc, version);
-		}
-
-		private static DateTime TimeStampToDateTime(long timeStamp) {
-			return new DateTime(1970, 1, 1).AddMilliseconds(timeStamp);
 		}
 
 		internal static class NormalApi {

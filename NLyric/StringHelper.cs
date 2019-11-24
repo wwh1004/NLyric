@@ -16,7 +16,7 @@ namespace NLyric {
 		public static IComparer<string> OrdinalComparer => StringOrdinalComparer.Instance;
 
 		/// <summary>
-		/// 获取非空字符串，并且清楚首尾空格
+		/// 获取非空字符串，并且清除首尾空格
 		/// </summary>
 		/// <param name="value"></param>
 		/// <returns></returns>
@@ -105,7 +105,7 @@ namespace NLyric {
 			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
-			return value.Split(_searchSettings.Separators, StringSplitOptions.RemoveEmptyEntries);
+			return value.Split(_searchSettings.Separators, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToArray();
 		}
 
 		/// <summary>
