@@ -35,15 +35,18 @@ namespace NLyric {
 			LoadDatabase(databasePath);
 			foreach (string audioPath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string lrcPath;
+				TagLib.File audioFile;
 
 				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
 				if (CanSkip(audioPath, lrcPath))
 					continue;
-				using (TagLib.File audioFile = TagLib.File.Create(audioPath)) {
+				audioFile = null;
+				try {
 					Tag tag;
 					TrackInfo trackInfo;
 
 					Logger.Instance.LogInfo($"开始搜索文件\"{Path.GetFileName(audioPath)}\"的歌词。");
+					audioFile = TagLib.File.Create(audioPath);
 					tag = audioFile.Tag;
 					trackInfo = await SearchTrackAsync(tag);
 					if (trackInfo is null)
@@ -52,6 +55,13 @@ namespace NLyric {
 						Logger.Instance.LogInfo($"已获取文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID: {trackInfo.Id}。");
 						await TryDownloadLyricAsync(trackInfo, lrcPath);
 					}
+				}
+				catch (Exception ex) {
+					Logger.Instance.LogError("无效音频文件！");
+					Logger.Instance.LogException(ex);
+				}
+				finally {
+					audioFile?.Dispose();
 				}
 				SaveDatabaseCore(databasePath);
 				Logger.Instance.LogNewLine();
