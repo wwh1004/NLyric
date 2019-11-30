@@ -266,7 +266,7 @@ namespace NLyric {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
 						// 是最新版本
-						Logger.Instance.LogInfo("本地歌词已是最新版本，正在跳过。", ConsoleColor.Yellow);
+						Logger.Instance.LogInfo("本地歌词已是最新版本，正在跳过。");
 						return false;
 					}
 					else {
