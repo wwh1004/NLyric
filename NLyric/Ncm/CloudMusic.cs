@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Extensions;
 using System.Linq;
-using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NeteaseCloudMusicApi;
@@ -13,18 +11,18 @@ using NLyric.Lyrics;
 namespace NLyric.Ncm {
 	public static class CloudMusic {
 		private static readonly CloudMusicApi _api = new CloudMusicApi();
-		private static bool _isLoggedIn;
 
 		public static async Task<bool> LoginAsync(string account, string password) {
 			Dictionary<string, string> queries;
 			bool isPhone;
+			bool result;
 
 			queries = new Dictionary<string, string>();
 			isPhone = Regex.Match(account, "^[0-9]+$").Success;
 			queries[isPhone ? "phone" : "email"] = account;
 			queries["password"] = password;
-			(_isLoggedIn, _) = await _api.RequestAsync(isPhone ? CloudMusicApiProviders.LoginCellphone : CloudMusicApiProviders.Login, queries);
-			return _isLoggedIn;
+			(result, _) = await _api.RequestAsync(isPhone ? CloudMusicApiProviders.LoginCellphone : CloudMusicApiProviders.Login, queries);
+			return result;
 		}
 
 		public static async Task<NcmTrack[]> SearchTrackAsync(Track track, int limit, bool withArtists) {
@@ -42,17 +40,11 @@ namespace NLyric.Ncm {
 				throw new ArgumentException("歌曲信息无效");
 			for (int i = 0; i < keywords.Count; i++)
 				keywords[i] = keywords[i].WholeWordReplace();
-			if (_isLoggedIn) {
-				(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Search, new Dictionary<string, string> {
-					{ "keywords", string.Join(" ", keywords) },
-					{ "type", "1" },
-					{ "limit", limit.ToString() }
-				});
-			}
-			else {
-				json = await NormalApi.SearchAsync(keywords, NormalApi.SearchType.Track, limit);
-				isOk = true;
-			}
+			(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Search, new Dictionary<string, string> {
+				{ "keywords", string.Join(" ", keywords) },
+				{ "type", "1" },
+				{ "limit", limit.ToString() }
+			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
 			json = (JObject)json["result"];
@@ -79,17 +71,11 @@ namespace NLyric.Ncm {
 				throw new ArgumentException("专辑信息无效");
 			for (int i = 0; i < keywords.Count; i++)
 				keywords[i] = keywords[i].WholeWordReplace();
-			if (_isLoggedIn) {
-				(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Search, new Dictionary<string, string> {
-					{ "keywords", string.Join(" ", keywords) },
-					{ "type", "10" },
-					{ "limit", limit.ToString() }
-				});
-			}
-			else {
-				json = await NormalApi.SearchAsync(keywords, NormalApi.SearchType.Album, limit);
-				isOk = true;
-			}
+			(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Search, new Dictionary<string, string> {
+				{ "keywords", string.Join(" ", keywords) },
+				{ "type", "10" },
+				{ "limit", limit.ToString() }
+			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
 			json = (JObject)json["result"];
@@ -103,23 +89,15 @@ namespace NLyric.Ncm {
 		}
 
 		public static async Task<NcmTrack[]> GetTracksAsync(int albumId) {
-			if (_isLoggedIn) {
-				bool isOk;
-				JObject json;
+			bool isOk;
+			JObject json;
 
-				(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Album, new Dictionary<string, string> {
-					{ "id", albumId.ToString() }
-				});
-				if (!isOk)
-					throw new ApplicationException(nameof(CloudMusicApiProviders.Album) + " API错误");
-				return json["songs"].Select(t => ParseTrack(t, true)).ToArray();
-			}
-			else {
-				JObject json;
-
-				json = await NormalApi.GetAlbumAsync(albumId);
-				return json["album"]["songs"].Select(t => ParseTrack(t, false)).ToArray();
-			}
+			(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Album, new Dictionary<string, string> {
+				{ "id", albumId.ToString() }
+			});
+			if (!isOk)
+				throw new ApplicationException(nameof(CloudMusicApiProviders.Album) + " API错误");
+			return json["songs"].Select(t => ParseTrack(t, true)).ToArray();
 		}
 
 		public static async Task<NcmLyric> GetLyricAsync(int trackId) {
@@ -130,15 +108,9 @@ namespace NLyric.Ncm {
 			Lrc translatedLrc;
 			int translatedVersion;
 
-			if (_isLoggedIn) {
-				(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Lyric, new Dictionary<string, string> {
-					{ "id", trackId.ToString() }
-				});
-			}
-			else {
-				json = await NormalApi.GetLyricAsync(trackId);
-				isOk = true;
-			}
+			(isOk, json) = await _api.RequestAsync(CloudMusicApiProviders.Lyric, new Dictionary<string, string> {
+				{ "id", trackId.ToString() }
+			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Lyric) + " API错误");
 			if ((bool?)json["uncollected"] == true)
@@ -183,76 +155,6 @@ namespace NLyric.Ncm {
 			lrc = string.IsNullOrEmpty(lyric) ? null : Lrc.UnsafeParse(lyric);
 			version = (int)json["version"];
 			return (lrc, version);
-		}
-
-		internal static class NormalApi {
-			private const string SEARCH_URL = "http://music.163.com/api/search/pc";
-			private const string ALBUM_URL = "http://music.163.com/api/album";
-			private const string LYRIC_URL = "http://music.163.com/api/song/lyric";
-
-			/// <summary>
-			/// 搜索类型
-			/// </summary>
-			public enum SearchType {
-				Track = 1,
-				Album = 10
-			}
-
-			public static async Task<JObject> SearchAsync(IEnumerable<string> keywords, SearchType type, int limit) {
-				QueryCollection queries;
-
-				queries = new QueryCollection {
-					{ "s", string.Join(" ", keywords) },
-					{ "type", ((int)type).ToString() },
-					{ "limit", limit.ToString() }
-				};
-				using (HttpClient client = new HttpClient())
-				using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, SEARCH_URL, queries, null)) {
-					JObject json;
-
-					if (!response.IsSuccessStatusCode)
-						throw new HttpRequestException();
-					json = JObject.Parse(await response.Content.ReadAsStringAsync());
-					if ((int)json["code"] != 200)
-						throw new HttpRequestException();
-					return json;
-				}
-			}
-
-			public static async Task<JObject> GetAlbumAsync(int id) {
-				using (HttpClient client = new HttpClient())
-				using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, ALBUM_URL + "/" + id.ToString())) {
-					JObject json;
-
-					if (!response.IsSuccessStatusCode)
-						throw new HttpRequestException();
-					json = JObject.Parse(await response.Content.ReadAsStringAsync());
-					if ((int)json["code"] != 200)
-						throw new HttpRequestException();
-					return json;
-				}
-			}
-
-			public static async Task<JObject> GetLyricAsync(int id) {
-				QueryCollection queries;
-
-				queries = new QueryCollection {
-					{ "id", id.ToString() },
-					{ "lv", "-1" },
-					{ "tv", "-1" }
-				};
-				using (HttpClient client = new HttpClient())
-				using (HttpResponseMessage response = await client.SendAsync(HttpMethod.Get, LYRIC_URL, queries, null)) {
-					JObject json;
-
-					if (!response.IsSuccessStatusCode)
-						throw new HttpRequestException();
-					json = JObject.Parse(await response.Content.ReadAsStringAsync());
-					if ((int)json["code"] != 200)
-						throw new HttpRequestException();
-					return json;
-				}
-			}
 		}
 	}
 }
