@@ -32,6 +32,7 @@ namespace NLyric {
 			string databasePath;
 			AudioInfo[] audioInfos;
 
+			FastConsole.WriteLine("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
 			loginTask = LoginIfNeedAsync(arguments);
 			databasePath = Path.Combine(arguments.Directory, ".nlyric");
 			LoadDatabase(databasePath);
@@ -60,6 +61,8 @@ namespace NLyric {
 				SaveDatabaseCore(databasePath);
 				FastConsole.WriteNewLine();
 			}
+			if (arguments.UseBatch)
+				PrepareAllLyrics(audioInfos);
 			foreach (AudioInfo audioInfo in audioInfos)
 				if (!(audioInfo.TrackInfo is null))
 					await TryDownloadLyricAsync(audioInfo);
@@ -253,6 +256,15 @@ namespace NLyric {
 			return ncmTracks;
 		}
 
+		private static void PrepareAllLyrics(AudioInfo[] audioInfos) {
+			int[] trackIds;
+
+			trackIds = audioInfos.Where(t => !(t.TrackInfo is null)).Select(t => t.TrackInfo.Id).ToArray();
+			for (int i = 0; i < trackIds.Length; i += 50) {
+				// TODO
+			}
+		}
+
 		private static async Task<bool> TryDownloadLyricAsync(AudioInfo audioInfo) {
 			string lrcPath;
 			bool hasLrcFile;
@@ -272,12 +284,12 @@ namespace NLyric {
 				FastConsole.WriteException(ex);
 				return false;
 			}
+			FastConsole.WriteInfo($"正在尝试下载\"{Path.GetFileName(audioInfo.Path)} ({audioInfo.Track})\"的歌词。");
 			if (hasLrcFile) {
 				// 如果歌词存在，判断是否需要覆盖或更新
 				LyricInfo lyricInfo;
 
 				lyricInfo = trackInfo.Lyric;
-				FastConsole.WriteInfo($"正在尝试下载\"{Path.GetFileName(audioInfo.Path)} ({audioInfo.Track})\"的歌词。");
 				if (!(lyricInfo is null) && lyricInfo.CheckSum == lyricCheckSum) {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
