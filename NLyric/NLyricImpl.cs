@@ -28,11 +28,42 @@ namespace NLyric {
 		private static NLyricDatabase _database;
 
 		public static async Task ExecuteAsync(Arguments arguments) {
+			Task loginTask;
 			string databasePath;
+			List<AudioTag> audioTags;
 
-			await LoginIfNeedAsync(arguments);
+			loginTask = LoginIfNeedAsync(arguments);
 			databasePath = Path.Combine(arguments.Directory, ".nlyric");
 			LoadDatabase(databasePath);
+			audioTags = Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories).Where(audioPath => {
+				string lrcPath;
+
+				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
+				return !CanSkip(audioPath, lrcPath);
+			}).AsParallel().AsOrdered().Select(audioPath => {
+				TagLib.File audioFile;
+				AudioTag audioTag;
+
+				audioFile = null;
+				audioTag = new AudioTag();
+				try {
+					audioFile = TagLib.File.Create(audioPath);
+					audioTag.Tag = audioFile.Tag;
+					if (Album.HasAlbumInfo(audioTag.Tag))
+						audioTag.Album = new Album(audioTag.Tag, true);
+					audioTag.Track = new Track(audioTag.Tag);
+				}
+				catch (Exception ex) {
+					FastConsole.WriteError("无效音频文件！");
+					FastConsole.WriteException(ex);
+				}
+				finally {
+					audioFile?.Dispose();
+				}
+				return audioTag;
+			}).ToList();
+			await loginTask;
+			// 登录同时进行
 			foreach (string audioPath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
 				string lrcPath;
 				TagLib.File audioFile;
@@ -45,27 +76,28 @@ namespace NLyric {
 					Tag tag;
 					TrackInfo trackInfo;
 
-					Logger.Instance.LogInfo($"开始搜索文件\"{Path.GetFileName(audioPath)}\"的歌词。");
+					FastConsole.WriteInfo($"开始搜索文件\"{Path.GetFileName(audioPath)}\"的歌词。");
 					audioFile = TagLib.File.Create(audioPath);
 					tag = audioFile.Tag;
+					audioFile?.Dispose();
 					trackInfo = await SearchTrackAsync(tag);
 					if (trackInfo is null)
-						Logger.Instance.LogWarning($"无法找到文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID！");
+						FastConsole.WriteWarning($"无法找到文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID！");
 					else {
-						Logger.Instance.LogInfo($"已获取文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID: {trackInfo.Id}。");
+						FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID: {trackInfo.Id}。");
 						await TryDownloadLyricAsync(trackInfo, lrcPath);
 					}
 				}
 				catch (Exception ex) {
-					Logger.Instance.LogError("无效音频文件！");
-					Logger.Instance.LogException(ex);
+					FastConsole.WriteError("无效音频文件！");
+					FastConsole.WriteException(ex);
 				}
 				finally {
 					audioFile?.Dispose();
 				}
 				SaveDatabaseCore(databasePath);
-				Logger.Instance.LogNewLine();
-				Logger.Instance.LogNewLine();
+				FastConsole.WriteNewLine();
+				FastConsole.WriteNewLine();
 			}
 			SaveDatabase(databasePath);
 		}
@@ -73,23 +105,23 @@ namespace NLyric {
 		private static async Task LoginIfNeedAsync(Arguments arguments) {
 			if (string.IsNullOrEmpty(arguments.Account) || string.IsNullOrEmpty(arguments.Password)) {
 				for (int i = 0; i < 3; i++)
-					Logger.Instance.LogInfo("登录可避免出现大部分API错误！！！当前是免登录状态，若软件出错请尝试登录！！！", ConsoleColor.Green);
-				Logger.Instance.LogInfo("强烈建议登录使用软件：\"NLyric.exe -d C:\\Music -a example@example.com -p 123456\"", ConsoleColor.Green);
+					FastConsole.WriteLine("登录可避免出现大部分API错误！！！当前是免登录状态，若软件出错请尝试登录！！！", ConsoleColor.Green);
+				FastConsole.WriteLine("强烈建议登录使用软件：\"NLyric.exe -d C:\\Music -a example@example.com -p 123456\"", ConsoleColor.Green);
 			}
 			else {
-				Logger.Instance.LogInfo("登录中...", ConsoleColor.Green);
+				FastConsole.WriteLine("登录中...", ConsoleColor.Green);
 				if (await CloudMusic.LoginAsync(arguments.Account, arguments.Password))
-					Logger.Instance.LogInfo("登录成功！", ConsoleColor.Green);
+					FastConsole.WriteLine("登录成功！", ConsoleColor.Green);
 				else {
-					Logger.Instance.LogError("登录失败，输入任意键以免登录模式运行或重新运行尝试再次登录！");
+					FastConsole.WriteError("登录失败，输入任意键以免登录模式运行或重新运行尝试再次登录！");
 					try {
-						Console.ReadKey(true);
+						FastConsole.ReadKey(true);
 					}
 					catch {
 					}
 				}
 			}
-			Logger.Instance.LogNewLine();
+			FastConsole.WriteNewLine();
 		}
 
 		private static bool CanSkip(string audioPath, string lrcPath) {
@@ -99,7 +131,7 @@ namespace NLyric {
 			if (!IsAudioFile(extension))
 				return true;
 			if (File.Exists(lrcPath) && !_lyricSettings.AutoUpdate && !_lyricSettings.Overwriting) {
-				Logger.Instance.LogInfo($"文件\"{Path.GetFileName(audioPath)}\"的歌词已存在，并且自动更新与覆盖已被禁止，正在跳过。");
+				FastConsole.WriteInfo($"文件\"{Path.GetFileName(audioPath)}\"的歌词已存在，并且自动更新与覆盖已被禁止，正在跳过。");
 				return true;
 			}
 			return false;
@@ -125,7 +157,7 @@ namespace NLyric {
 				return await SearchTrackAsync(tag, track, album);
 			}
 			catch (Exception ex) {
-				Logger.Instance.LogException(ex);
+				FastConsole.WriteException(ex);
 			}
 			return null;
 		}
@@ -178,11 +210,11 @@ namespace NLyric {
 				trackId = 0;
 			}
 			if (ncmTrack is null && !byUser)
-				Logger.Instance.LogWarning("歌曲匹配失败！");
+				FastConsole.WriteWarning("歌曲匹配失败！");
 			else {
 				trackInfo = new TrackInfo(track, album, byUser ? trackId : ncmTrack.Id);
 				_database.TrackInfos.Add(trackInfo);
-				Logger.Instance.LogInfo("歌曲匹配成功！");
+				FastConsole.WriteInfo("歌曲匹配成功！");
 			}
 			return trackInfo;
 		}
@@ -216,12 +248,12 @@ namespace NLyric {
 			}
 			if (ncmAlbum is null && !byUser) {
 				_failMatchAlbums.Add(replacedAlbumName);
-				Logger.Instance.LogWarning("专辑匹配失败！");
+				FastConsole.WriteWarning("专辑匹配失败！");
 			}
 			else {
 				albumInfo = new AlbumInfo(album, byUser ? albumId : ncmAlbum.Id);
 				_database.AlbumInfos.Add(albumInfo);
-				Logger.Instance.LogInfo("专辑匹配成功！");
+				FastConsole.WriteInfo("专辑匹配成功！");
 			}
 			return albumInfo;
 		}
@@ -254,7 +286,7 @@ namespace NLyric {
 				ncmLyric = await GetLyricAsync(trackInfo.Id);
 			}
 			catch (Exception ex) {
-				Logger.Instance.LogException(ex);
+				FastConsole.WriteException(ex);
 				return false;
 			}
 			if (hasLrcFile) {
@@ -266,15 +298,15 @@ namespace NLyric {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
 						// 是最新版本
-						Logger.Instance.LogInfo("本地歌词已是最新版本，正在跳过。");
+						FastConsole.WriteInfo("本地歌词已是最新版本，正在跳过。");
 						return false;
 					}
 					else {
 						// 不是最新版本
 						if (_lyricSettings.AutoUpdate)
-							Logger.Instance.LogInfo("本地歌词不是最新版本，正在更新。", ConsoleColor.Green);
+							FastConsole.WriteLine("本地歌词不是最新版本，正在更新。", ConsoleColor.Green);
 						else {
-							Logger.Instance.LogInfo("本地歌词不是最新版本但是自动更新被禁止，正在跳过。", ConsoleColor.Yellow);
+							FastConsole.WriteLine("本地歌词不是最新版本但是自动更新被禁止，正在跳过。", ConsoleColor.Yellow);
 							return false;
 						}
 					}
@@ -282,9 +314,9 @@ namespace NLyric {
 				else {
 					// 歌词非NLyric创建
 					if (_lyricSettings.Overwriting)
-						Logger.Instance.LogInfo("本地歌词非NLyric创建，正在更新。", ConsoleColor.Yellow);
+						FastConsole.WriteLine("本地歌词非NLyric创建，正在更新。", ConsoleColor.Yellow);
 					else {
-						Logger.Instance.LogInfo("本地歌词非NLyric创建但是覆盖被禁止，正在跳过。", ConsoleColor.Yellow);
+						FastConsole.WriteLine("本地歌词非NLyric创建但是覆盖被禁止，正在跳过。", ConsoleColor.Yellow);
 						return false;
 					}
 				}
@@ -299,11 +331,11 @@ namespace NLyric {
 					File.WriteAllText(lrcPath, lyric);
 				}
 				catch (Exception ex) {
-					Logger.Instance.LogException(ex);
+					FastConsole.WriteException(ex);
 					return false;
 				}
 				trackInfo.Lyric = new LyricInfo(ncmLyric, ComputeLyricCheckSum(lyric));
-				Logger.Instance.LogInfo("本地歌词下载完毕。", ConsoleColor.Magenta);
+				FastConsole.WriteLine("本地歌词下载完毕。", ConsoleColor.Magenta);
 			}
 			return true;
 		}
@@ -320,11 +352,11 @@ namespace NLyric {
 
 			NcmTrack ncmTrack;
 
-			Logger.Instance.LogInfo($"开始搜索歌曲\"{track}\"。");
-			Logger.Instance.LogWarning("正在尝试带艺术家搜索，结果可能将过少！");
+			FastConsole.WriteInfo($"开始搜索歌曲\"{track}\"。");
+			FastConsole.WriteWarning("正在尝试带艺术家搜索，结果可能将过少！");
 			ncmTrack = await MapToAsync(track, true);
 			if (ncmTrack is null && _fuzzySettings.TryIgnoringArtists) {
-				Logger.Instance.LogWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
+				FastConsole.WriteWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
 				ncmTrack = await MapToAsync(track, false);
 			}
 			return ncmTrack;
@@ -341,11 +373,11 @@ namespace NLyric {
 
 			NcmAlbum ncmAlbum;
 
-			Logger.Instance.LogInfo($"开始搜索专辑\"{album}\"。");
-			Logger.Instance.LogWarning("正在尝试带艺术家搜索，结果可能将过少！");
+			FastConsole.WriteInfo($"开始搜索专辑\"{album}\"。");
+			FastConsole.WriteWarning("正在尝试带艺术家搜索，结果可能将过少！");
 			ncmAlbum = await MapToAsync(album, true);
 			if (ncmAlbum is null && _fuzzySettings.TryIgnoringArtists) {
-				Logger.Instance.LogWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
+				FastConsole.WriteWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
 				ncmAlbum = await MapToAsync(album, false);
 			}
 			return ncmAlbum;
@@ -365,11 +397,11 @@ namespace NLyric {
 				ncmTracks = await CloudMusic.SearchTrackAsync(track, _searchSettings.Limit, withArtists);
 			}
 			catch (KeywordForbiddenException ex1) {
-				Logger.Instance.LogError(ex1.Message);
+				FastConsole.WriteError(ex1.Message);
 				return null;
 			}
 			catch (Exception ex2) {
-				Logger.Instance.LogException(ex2);
+				FastConsole.WriteException(ex2);
 				return null;
 			}
 			list = new List<NcmTrack>();
@@ -393,11 +425,11 @@ namespace NLyric {
 				ncmAlbums = await CloudMusic.SearchAlbumAsync(album, _searchSettings.Limit, withArtists);
 			}
 			catch (KeywordForbiddenException ex1) {
-				Logger.Instance.LogError(ex1.Message);
+				FastConsole.WriteError(ex1.Message);
 				return null;
 			}
 			catch (Exception ex2) {
-				Logger.Instance.LogException(ex2);
+				FastConsole.WriteException(ex2);
 				return null;
 			}
 			ncmAlbums = ncmAlbums.Where(t => ComputeSimilarity(t.Name, album.Name, false) != 0).ToArray();
@@ -412,10 +444,10 @@ namespace NLyric {
 				if (!_database.CheckFormatVersion())
 					throw new InvalidOperationException("尝试加载新格式数据库。");
 				if (_database.IsOldFormat())
-					Logger.Instance.LogWarning("不兼容的老格式数据库，将被覆盖重建！");
+					FastConsole.WriteWarning("不兼容的老格式数据库，将被覆盖重建！");
 				else {
 					SortDatabase();
-					Logger.Instance.LogInfo($"搜索数据库\"{databasePath}\"加载成功。");
+					FastConsole.WriteInfo($"搜索数据库\"{databasePath}\"加载成功。");
 					return;
 				}
 			}
@@ -433,7 +465,7 @@ namespace NLyric {
 		private static void SaveDatabase(string databasePath) {
 			SortDatabase();
 			SaveDatabaseCore(databasePath);
-			Logger.Instance.LogInfo($"搜索数据库\"{databasePath}\"已被保存。");
+			FastConsole.WriteInfo($"搜索数据库\"{databasePath}\"已被保存。");
 		}
 
 		private static void SortDatabase() {
@@ -524,8 +556,8 @@ namespace NLyric {
 
 			if (sources.Length == 0)
 				return null;
-			Logger.Instance.LogInfo("请手动输入1,2,3...选择匹配的项，若不存在，请直接按下回车键。");
-			Logger.Instance.LogInfo("对比项：" + TrackOrAlbumToString(target));
+			FastConsole.WriteInfo("请手动输入1,2,3...选择匹配的项，若不存在，请直接按下回车键。");
+			FastConsole.WriteInfo("对比项：" + TrackOrAlbumToString(target));
 			for (int i = 0; i < sources.Length; i++) {
 				double nameSimilarity;
 				string text;
@@ -533,18 +565,18 @@ namespace NLyric {
 				nameSimilarity = nameSimilarities[sources[i]];
 				text = $"{i + 1}. {sources[i]} (s:{nameSimilarity.ToString("F2")})";
 				if (nameSimilarity >= 0.85)
-					Logger.Instance.LogInfo(text, ConsoleColor.Green);
+					FastConsole.WriteLine(text, ConsoleColor.Green);
 				else if (nameSimilarity >= 0.5)
-					Logger.Instance.LogInfo(text, ConsoleColor.Yellow);
+					FastConsole.WriteLine(text, ConsoleColor.Yellow);
 				else
-					Logger.Instance.LogInfo(text);
+					FastConsole.WriteInfo(text);
 			}
 			result = null;
 			do {
 				string userInput;
 				int index;
 
-				userInput = Console.ReadLine().Trim();
+				userInput = FastConsole.ReadLine().Trim();
 				if (userInput.Length == 0)
 					break;
 				if (int.TryParse(userInput, out index)) {
@@ -554,10 +586,10 @@ namespace NLyric {
 						break;
 					}
 				}
-				Logger.Instance.LogWarning("输入有误，请重新输入！");
+				FastConsole.WriteWarning("输入有误，请重新输入！");
 			} while (true);
 			if (!(result is null))
-				Logger.Instance.LogInfo("已选择：" + result.ToString());
+				FastConsole.WriteInfo("已选择：" + result.ToString());
 			return result;
 
 			string TrackOrAlbumToString(ITrackOrAlbum trackOrAlbum) {
@@ -580,16 +612,16 @@ namespace NLyric {
 		}
 
 		private static bool GetIdByUser(string s, out int id) {
-			Logger.Instance.LogInfo($"请输入{s}的网易云音乐ID，若不存在，请直接按下回车键。");
+			FastConsole.WriteInfo($"请输入{s}的网易云音乐ID，若不存在，请直接按下回车键。");
 			do {
 				string userInput;
 
-				userInput = Console.ReadLine().Trim();
+				userInput = FastConsole.ReadLine().Trim();
 				if (userInput.Length == 0)
 					break;
 				if (int.TryParse(userInput, out id))
 					return true;
-				Logger.Instance.LogWarning("输入有误，请重新输入！");
+				FastConsole.WriteWarning("输入有误，请重新输入！");
 			} while (true);
 			id = 0;
 			return false;
@@ -609,11 +641,11 @@ namespace NLyric {
 
 		private static Lrc ToLrc(NcmLyric lyric) {
 			if (!lyric.IsCollected) {
-				Logger.Instance.LogWarning("当前歌曲的歌词未被收录！");
+				FastConsole.WriteWarning("当前歌曲的歌词未被收录！");
 				return null;
 			}
 			if (lyric.IsAbsoluteMusic) {
-				Logger.Instance.LogWarning("当前歌曲是纯音乐无歌词！");
+				FastConsole.WriteWarning("当前歌曲是纯音乐无歌词！");
 				return null;
 			}
 			if (!(lyric.Raw is null))
@@ -625,23 +657,23 @@ namespace NLyric {
 				case "MERGED":
 					if (lyric.Raw is null || lyric.Translated is null)
 						continue;
-					Logger.Instance.LogInfo("已获取混合歌词。");
+					FastConsole.WriteInfo("已获取混合歌词。");
 					return MergeLyric(lyric.Raw, lyric.Translated);
 				case "RAW":
 					if (lyric.Raw is null)
 						continue;
-					Logger.Instance.LogInfo("已获取原始歌词。");
+					FastConsole.WriteInfo("已获取原始歌词。");
 					return lyric.Raw;
 				case "TRANSLATED":
 					if (lyric.Translated is null)
 						continue;
-					Logger.Instance.LogInfo("已获取翻译歌词。");
+					FastConsole.WriteInfo("已获取翻译歌词。");
 					return lyric.Translated;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(mode));
 				}
 			}
-			Logger.Instance.LogWarning("获取歌词失败（可能歌曲是纯音乐但是未被网易云音乐标记为纯音乐）。");
+			FastConsole.WriteWarning("获取歌词失败（可能歌曲是纯音乐但是未被网易云音乐标记为纯音乐）。");
 			return null;
 		}
 
@@ -693,5 +725,13 @@ namespace NLyric {
 			return Crc32.Compute(Encoding.Unicode.GetBytes(lyric)).ToString("X8");
 		}
 		#endregion
+
+		private sealed class AudioTag {
+			public Tag Tag { get; set; }
+
+			public Album Album { get; set; }
+
+			public Track Track { get; set; }
+		}
 	}
 }

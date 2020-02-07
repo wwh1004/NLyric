@@ -28,7 +28,8 @@ namespace NLyric {
 			}
 			AllSettings.Default = JsonConvert.DeserializeObject<AllSettings>(File.ReadAllText("Settings.json"));
 			await NLyricImpl.ExecuteAsync(arguments);
-			Logger.Instance.LogInfo("完成", ConsoleColor.Green);
+			FastConsole.WriteLine("完成", ConsoleColor.Green);
+			FastConsole.Synchronize();
 			if (IsN00bUser() || Debugger.IsAttached) {
 				Console.WriteLine("按任意键继续...");
 				try {
