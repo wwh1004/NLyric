@@ -12,11 +12,11 @@ namespace NLyric.Database {
 			return caches.FirstOrDefault(t => IsMatched(t, album));
 		}
 
-		public static TrackInfo Match(this IEnumerable<TrackInfo> caches, Track track, Album album) {
+		public static TrackInfo Match(this IEnumerable<TrackInfo> caches, Album album, Track track) {
 			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 
-			return caches.FirstOrDefault(t => IsMatched(t, track, album));
+			return caches.FirstOrDefault(t => IsMatched(t, album, track));
 		}
 
 		public static bool IsMatched(this AlbumInfo cache, Album album) {
@@ -26,7 +26,7 @@ namespace NLyric.Database {
 			return cache.Name == album.Name;
 		}
 
-		public static bool IsMatched(this TrackInfo cache, Track track, Album album) {
+		public static bool IsMatched(this TrackInfo cache, Album album, Track track) {
 			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 

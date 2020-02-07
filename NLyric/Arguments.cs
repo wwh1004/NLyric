@@ -7,6 +7,7 @@ namespace NLyric {
 		private string _directory;
 		private string _account;
 		private string _password;
+		private bool _useBatch;
 
 		[Argument("-d", IsRequired = false, DefaultValue = "", Type = "DIR", Description = "存放音乐的文件夹，可以是相对路径或者绝对路径")]
 		public string DirectoryCliSetter {
@@ -38,6 +39,11 @@ namespace NLyric {
 			}
 		}
 
+		[Argument("--batch", Description = "使用Batch API（实验性）")]
+		public bool UseBatchCliSetter {
+			set => _useBatch = value;
+		}
+
 		public string Directory {
 			get => _directory;
 			set {
@@ -66,6 +72,11 @@ namespace NLyric {
 
 				_password = value;
 			}
+		}
+
+		public bool UseBatch {
+			get => _useBatch;
+			set => _useBatch = value;
 		}
 	}
 }

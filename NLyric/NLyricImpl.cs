@@ -35,52 +35,34 @@ namespace NLyric {
 			loginTask = LoginIfNeedAsync(arguments);
 			databasePath = Path.Combine(arguments.Directory, ".nlyric");
 			LoadDatabase(databasePath);
-			audioInfos = Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories).Where(audioPath => {
-				string lrcPath;
-
-				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
-				return !CanSkip(audioPath, lrcPath);
-			}).AsParallel().AsOrdered().Select(audioPath => {
-				TagLib.File audioFile;
-				AudioInfo audioInfo;
-
-				audioFile = null;
-				audioInfo = new AudioInfo {
-					Path = audioPath
-				};
-				try {
-					audioFile = TagLib.File.Create(audioPath);
-					audioInfo.Tag = audioFile.Tag;
-					if (Album.HasAlbumInfo(audioInfo.Tag))
-						audioInfo.Album = new Album(audioInfo.Tag, true);
-					audioInfo.Track = new Track(audioInfo.Tag);
-				}
-				catch (Exception ex) {
-					FastConsole.WriteError("无效音频文件！");
-					FastConsole.WriteException(ex);
-				}
-				finally {
-					audioFile?.Dispose();
-				}
-				return audioInfo;
-			}).ToArray();
+			audioInfos = LoadAllAudioInfos(arguments.Directory);
 			await loginTask;
 			// 登录同时进行
 			foreach (AudioInfo audioInfo in audioInfos) {
 				TrackInfo trackInfo;
 
-				FastConsole.WriteInfo($"开始搜索文件\"{Path.GetFileName(audioInfo.Path)}\"的歌词。");
-				trackInfo = await SearchTrackAsync(audioInfo.Tag);
+				if (!(audioInfo.TrackInfo is null))
+					continue;
+				FastConsole.WriteInfo($"开始获取文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID。");
+				try {
+					trackInfo = await SearchTrackAsync(audioInfo.Album, audioInfo.Track);
+				}
+				catch (Exception ex) {
+					FastConsole.WriteException(ex);
+					trackInfo = null;
+				}
 				if (trackInfo is null)
 					FastConsole.WriteWarning($"无法找到文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID！");
 				else {
 					FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID: {trackInfo.Id}。");
-					await TryDownloadLyricAsync(trackInfo, Path.ChangeExtension(audioInfo.Path, ".lrc"));
+					audioInfo.TrackInfo = new TrackInfo(audioInfo.Track, audioInfo.Album, trackInfo.Id);
 				}
 				SaveDatabaseCore(databasePath);
 				FastConsole.WriteNewLine();
-				FastConsole.WriteNewLine();
 			}
+			foreach (AudioInfo audioInfo in audioInfos)
+				if (!(audioInfo.TrackInfo is null))
+					await TryDownloadLyricAsync(audioInfo);
 			SaveDatabase(databasePath);
 		}
 
@@ -123,76 +105,91 @@ namespace NLyric {
 			return _searchSettings.AudioExtensions.Any(s => extension.Equals(s, StringComparison.OrdinalIgnoreCase));
 		}
 
-		/// <summary>
-		/// 同时根据专辑信息以及歌曲信息获取网易云音乐上的歌曲
-		/// </summary>
-		/// <param name="tag"></param>
-		/// <returns></returns>
-		private static async Task<TrackInfo> SearchTrackAsync(Tag tag) {
-			Track track;
-			Album album;
+		private static AudioInfo[] LoadAllAudioInfos(string directory) {
+			return Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Where(audioPath => {
+				string lrcPath;
 
-			track = new Track(tag);
-			album = Album.HasAlbumInfo(tag) ? new Album(tag, true) : null;
-			// 获取Tag信息
-			try {
-				return await SearchTrackAsync(tag, track, album);
-			}
-			catch (Exception ex) {
-				FastConsole.WriteException(ex);
-			}
-			return null;
+				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
+				return !CanSkip(audioPath, lrcPath);
+			}).AsParallel().AsOrdered().Select(audioPath => {
+				TagLib.File audioFile;
+				Tag tag;
+				AudioInfo audioInfo;
+				TrackInfo trackInfo;
+				int trackId;
+
+				audioFile = null;
+				audioInfo = new AudioInfo {
+					Path = audioPath
+				};
+				try {
+					audioFile = TagLib.File.Create(audioPath);
+					tag = audioFile.Tag;
+					if (Album.HasAlbumInfo(tag))
+						audioInfo.Album = new Album(tag, true);
+					audioInfo.Track = new Track(tag);
+				}
+				catch (Exception ex) {
+					FastConsole.WriteError("无效音频文件！");
+					FastConsole.WriteException(ex);
+					return null;
+				}
+				finally {
+					audioFile?.Dispose();
+				}
+				trackInfo = _database.TrackInfos.Match(audioInfo.Album, audioInfo.Track);
+				if (!(trackInfo is null)) {
+					audioInfo.TrackInfo = trackInfo;
+					return audioInfo;
+				}
+				// 尝试从数据库获取歌曲
+				if (The163KeyHelper.TryGetTrackId(tag, out trackId)) {
+					audioInfo.TrackInfo = new TrackInfo(audioInfo.Track, audioInfo.Album, trackId);
+					return audioInfo;
+				}
+				// 尝试从163Key获取ID
+				return audioInfo;
+			}).Where(t => !(t is null)).ToArray();
 		}
 
 		/// <summary>
 		/// 同时根据专辑信息以及歌曲信息获取网易云音乐上的歌曲
 		/// </summary>
-		/// <param name="tag"></param>
-		/// <param name="track"></param>
 		/// <param name="album"></param>
+		/// <param name="track"></param>
 		/// <returns></returns>
-		private static async Task<TrackInfo> SearchTrackAsync(Tag tag, Track track, Album album) {
-			TrackInfo trackInfo;
+		private static async Task<TrackInfo> SearchTrackAsync(Album album, Track track) {
+			AlbumInfo albumInfo;
 			int trackId;
 			NcmTrack ncmTrack;
 			bool byUser;
+			TrackInfo trackInfo;
 
-			trackInfo = _database.TrackInfos.Match(track, album);
-			if (!(trackInfo is null))
-				return trackInfo;
-			// 先尝试从数据库获取歌曲
-			if (The163KeyHelper.TryGetTrackId(tag, out trackId)) {
-				// 尝试从163Key获取ID成功
-				ncmTrack = new NcmTrack(track, trackId);
+			albumInfo = album is null ? null : await SearchAlbumAsync(album);
+			// 尝试获取专辑信息
+			if (!(albumInfo is null)) {
+				// 网易云音乐收录了歌曲所在专辑
+				NcmTrack[] ncmTracks;
+
+				ncmTracks = (await GetAlbumTracksAsync(albumInfo)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
+				// 获取网易云音乐上专辑收录的歌曲
+				ncmTrack = MatchByUser(ncmTracks, track);
 			}
-			else {
-				// 不存在163Key
-				AlbumInfo albumInfo;
-
-				albumInfo = album is null ? null : await SearchAlbumAsync(album);
-				// 尝试获取专辑信息
-				if (!(albumInfo is null)) {
-					// 网易云音乐收录了歌曲所在专辑
-					NcmTrack[] ncmTracks;
-
-					ncmTracks = (await GetAlbumTracksAsync(albumInfo)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
-					// 获取网易云音乐上专辑收录的歌曲
-					ncmTrack = MatchByUser(ncmTracks, track);
-				}
-				else
-					ncmTrack = null;
-				if (ncmTrack is null)
-					// 没有对应的专辑信息，使用无专辑匹配，或者网易云音乐上的专辑可能没收录这个歌曲，不清楚为什么，但是确实存在这个情况，比如专辑id:3094396
-					ncmTrack = await MapToAsync(track);
-			}
+			else
+				ncmTrack = null;
+			if (ncmTrack is null)
+				// 没有对应的专辑信息，使用无专辑匹配，或者网易云音乐上的专辑可能没收录这个歌曲，不清楚为什么，但是确实存在这个情况，比如专辑id:3094396
+				ncmTrack = await MapToAsync(track);
 			if (ncmTrack is null)
 				byUser = GetIdByUser("歌曲", out trackId);
 			else {
 				byUser = false;
 				trackId = 0;
 			}
-			if (ncmTrack is null && !byUser)
+			if (ncmTrack is null && !byUser) {
+				trackInfo = null;
 				FastConsole.WriteWarning("歌曲匹配失败！");
+			}
 			else {
 				trackInfo = new TrackInfo(track, album, byUser ? trackId : ncmTrack.Id);
 				_database.TrackInfos.Add(trackInfo);
@@ -256,14 +253,18 @@ namespace NLyric {
 			return ncmTracks;
 		}
 
-		private static async Task<bool> TryDownloadLyricAsync(TrackInfo trackInfo, string lrcPath) {
+		private static async Task<bool> TryDownloadLyricAsync(AudioInfo audioInfo) {
+			string lrcPath;
 			bool hasLrcFile;
 			string lyricCheckSum;
+			TrackInfo trackInfo;
 			NcmLyric ncmLyric;
 			Lrc lrc;
 
+			lrcPath = Path.ChangeExtension(audioInfo.Path, ".lrc");
 			hasLrcFile = File.Exists(lrcPath);
 			lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllText(lrcPath)) : null;
+			trackInfo = audioInfo.TrackInfo;
 			try {
 				ncmLyric = await GetLyricAsync(trackInfo.Id);
 			}
@@ -276,6 +277,7 @@ namespace NLyric {
 				LyricInfo lyricInfo;
 
 				lyricInfo = trackInfo.Lyric;
+				FastConsole.WriteInfo($"正在尝试下载\"{Path.GetFileName(audioInfo.Path)} ({audioInfo.Track})\"的歌词。");
 				if (!(lyricInfo is null) && lyricInfo.CheckSum == lyricCheckSum) {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
@@ -430,6 +432,7 @@ namespace NLyric {
 				else {
 					SortDatabase();
 					FastConsole.WriteInfo($"搜索数据库\"{databasePath}\"加载成功。");
+					FastConsole.WriteNewLine();
 					return;
 				}
 			}
@@ -711,11 +714,11 @@ namespace NLyric {
 		private sealed class AudioInfo {
 			public string Path { get; set; }
 
-			public Tag Tag { get; set; }
-
 			public Album Album { get; set; }
 
 			public Track Track { get; set; }
+
+			public TrackInfo TrackInfo { get; set; }
 		}
 	}
 }
