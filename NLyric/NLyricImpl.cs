@@ -30,28 +30,30 @@ namespace NLyric {
 		public static async Task ExecuteAsync(Arguments arguments) {
 			Task loginTask;
 			string databasePath;
-			List<AudioTag> audioTags;
+			AudioInfo[] audioInfos;
 
 			loginTask = LoginIfNeedAsync(arguments);
 			databasePath = Path.Combine(arguments.Directory, ".nlyric");
 			LoadDatabase(databasePath);
-			audioTags = Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories).Where(audioPath => {
+			audioInfos = Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories).Where(audioPath => {
 				string lrcPath;
 
 				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
 				return !CanSkip(audioPath, lrcPath);
 			}).AsParallel().AsOrdered().Select(audioPath => {
 				TagLib.File audioFile;
-				AudioTag audioTag;
+				AudioInfo audioInfo;
 
 				audioFile = null;
-				audioTag = new AudioTag();
+				audioInfo = new AudioInfo {
+					Path = audioPath
+				};
 				try {
 					audioFile = TagLib.File.Create(audioPath);
-					audioTag.Tag = audioFile.Tag;
-					if (Album.HasAlbumInfo(audioTag.Tag))
-						audioTag.Album = new Album(audioTag.Tag, true);
-					audioTag.Track = new Track(audioTag.Tag);
+					audioInfo.Tag = audioFile.Tag;
+					if (Album.HasAlbumInfo(audioInfo.Tag))
+						audioInfo.Album = new Album(audioInfo.Tag, true);
+					audioInfo.Track = new Track(audioInfo.Tag);
 				}
 				catch (Exception ex) {
 					FastConsole.WriteError("无效音频文件！");
@@ -60,40 +62,20 @@ namespace NLyric {
 				finally {
 					audioFile?.Dispose();
 				}
-				return audioTag;
-			}).ToList();
+				return audioInfo;
+			}).ToArray();
 			await loginTask;
 			// 登录同时进行
-			foreach (string audioPath in Directory.EnumerateFiles(arguments.Directory, "*", SearchOption.AllDirectories)) {
-				string lrcPath;
-				TagLib.File audioFile;
+			foreach (AudioInfo audioInfo in audioInfos) {
+				TrackInfo trackInfo;
 
-				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
-				if (CanSkip(audioPath, lrcPath))
-					continue;
-				audioFile = null;
-				try {
-					Tag tag;
-					TrackInfo trackInfo;
-
-					FastConsole.WriteInfo($"开始搜索文件\"{Path.GetFileName(audioPath)}\"的歌词。");
-					audioFile = TagLib.File.Create(audioPath);
-					tag = audioFile.Tag;
-					audioFile?.Dispose();
-					trackInfo = await SearchTrackAsync(tag);
-					if (trackInfo is null)
-						FastConsole.WriteWarning($"无法找到文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID！");
-					else {
-						FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(audioPath)}\"的网易云音乐ID: {trackInfo.Id}。");
-						await TryDownloadLyricAsync(trackInfo, lrcPath);
-					}
-				}
-				catch (Exception ex) {
-					FastConsole.WriteError("无效音频文件！");
-					FastConsole.WriteException(ex);
-				}
-				finally {
-					audioFile?.Dispose();
+				FastConsole.WriteInfo($"开始搜索文件\"{Path.GetFileName(audioInfo.Path)}\"的歌词。");
+				trackInfo = await SearchTrackAsync(audioInfo.Tag);
+				if (trackInfo is null)
+					FastConsole.WriteWarning($"无法找到文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID！");
+				else {
+					FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID: {trackInfo.Id}。");
+					await TryDownloadLyricAsync(trackInfo, Path.ChangeExtension(audioInfo.Path, ".lrc"));
 				}
 				SaveDatabaseCore(databasePath);
 				FastConsole.WriteNewLine();
@@ -726,7 +708,9 @@ namespace NLyric {
 		}
 		#endregion
 
-		private sealed class AudioTag {
+		private sealed class AudioInfo {
+			public string Path { get; set; }
+
 			public Tag Tag { get; set; }
 
 			public Album Album { get; set; }
