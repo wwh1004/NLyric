@@ -672,7 +672,7 @@ namespace NLyric {
 		}
 
 		private static string ComputeLyricCheckSum(string lyric) {
-			return CRC32_.Compute(Encoding.Unicode.GetBytes(lyric)).ToString("X8");
+			return CRC32.Compute(Encoding.Unicode.GetBytes(lyric)).ToString("X8");
 		}
 		#endregion
 

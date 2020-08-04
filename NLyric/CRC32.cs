@@ -1,7 +1,7 @@
 using System;
 
 namespace NLyric {
-	internal static class CRC32_ {
+	internal static class CRC32 {
 		private static readonly uint[] _table = GenerateTable(0xEDB88320);
 
 		public static uint Compute(byte[] data) {
