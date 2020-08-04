@@ -1,10 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
+using System.Reflection;
 using System.Threading.Tasks;
+using NeteaseCloudMusicApi;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NLyric.Audio;
 using NLyric.Database;
 using NLyric.Lyrics;
@@ -14,7 +17,7 @@ using TagLib;
 using File = System.IO.File;
 
 namespace NLyric {
-	internal static class NLyricImpl {
+	public static class NLyricImpl {
 		private static readonly SearchSettings _searchSettings = AllSettings.Default.Search;
 		private static readonly FuzzySettings _fuzzySettings = AllSettings.Default.Fuzzy;
 		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
@@ -33,35 +36,16 @@ namespace NLyric {
 			string databasePath = Path.Combine(arguments.Directory, ".nlyric");
 			LoadDatabase(databasePath);
 			var audioInfos = LoadAllAudioInfos(arguments.Directory);
+			var audioInfoCandidates = audioInfos.Where(t => t.TrackInfo is null).ToArray();
 			await loginTask;
 			// 登录同时进行
-			foreach (var audioInfo in audioInfos) {
-				if (!(audioInfo.TrackInfo is null))
-					continue;
-				FastConsole.WriteInfo($"开始获取文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID。");
-				TrackInfo trackInfo;
-				try {
-					trackInfo = await SearchTrackAsync(audioInfo.Album, audioInfo.Track);
-				}
-				catch (Exception ex) {
-					FastConsole.WriteException(ex);
-					trackInfo = null;
-				}
-				if (trackInfo is null)
-					FastConsole.WriteWarning($"无法找到文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID！");
-				else {
-					FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID: {trackInfo.Id}。");
-					audioInfo.TrackInfo = new TrackInfo(audioInfo.Track, audioInfo.Album, trackInfo.Id);
-				}
-				SaveDatabaseCore(databasePath);
-				FastConsole.WriteNewLine();
-			}
 			if (arguments.UseBatch)
-				PrepareAllLyrics(audioInfos);
-			foreach (var audioInfo in audioInfos) {
-				if (!(audioInfo.TrackInfo is null))
-					await TryDownloadLyricAsync(audioInfo);
-			}
+				_ = AccelerateAllTracksAsync(audioInfoCandidates);
+			await LoadAllAudioInfoCandidates(audioInfoCandidates, _ => SaveDatabaseCore(databasePath));
+			audioInfos = audioInfos.Where(t => !(t.TrackInfo is null)).ToArray();
+			if (arguments.UseBatch)
+				_ = AccelerateAllLyricsAsync(audioInfos);
+			await DownloadLyricsAsync(audioInfos);
 			SaveDatabase(databasePath);
 		}
 
@@ -72,8 +56,9 @@ namespace NLyric {
 			}
 			else {
 				FastConsole.WriteLine("登录中...", ConsoleColor.Green);
-				if (await CloudMusic.LoginAsync(arguments.Account, arguments.Password))
+				if (await CloudMusic.LoginAsync(arguments.Account, arguments.Password)) {
 					FastConsole.WriteLine("登录成功！", ConsoleColor.Green);
+				}
 				else {
 					FastConsole.WriteError("登录失败，输入任意键以免登录模式运行或重新运行尝试再次登录！");
 					try {
@@ -103,9 +88,7 @@ namespace NLyric {
 
 		private static AudioInfo[] LoadAllAudioInfos(string directory) {
 			return Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Where(audioPath => {
-				string lrcPath;
-
-				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
+				string lrcPath = Path.ChangeExtension(audioPath, ".lrc");
 				return !CanSkip(audioPath, lrcPath);
 			}).AsParallel().AsOrdered().Select(audioPath => {
 				var audioFile = default(TagLib.File);
@@ -143,6 +126,35 @@ namespace NLyric {
 			}).Where(t => !(t is null)).ToArray();
 		}
 
+		private static async Task LoadAllAudioInfoCandidates(AudioInfo[] audioInfoCandidates, Action<AudioInfo> callback) {
+			foreach (var candidate in audioInfoCandidates) {
+				FastConsole.WriteInfo($"开始获取文件\"{Path.GetFileName(candidate.Path)}\"的网易云音乐ID。");
+				TrackInfo trackInfo;
+				try {
+					trackInfo = await SearchTrackAsync(candidate.Album, candidate.Track);
+				}
+				catch (Exception ex) {
+					FastConsole.WriteException(ex);
+					trackInfo = null;
+				}
+				if (trackInfo is null) {
+					FastConsole.WriteWarning($"无法找到文件\"{Path.GetFileName(candidate.Path)}\"的网易云音乐ID！");
+				}
+				else {
+					FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(candidate.Path)}\"的网易云音乐ID: {trackInfo.Id}。");
+					candidate.TrackInfo = new TrackInfo(candidate.Track, candidate.Album, trackInfo.Id);
+				}
+				callback?.Invoke(candidate);
+				FastConsole.WriteNewLine();
+			}
+		}
+
+		private static async Task DownloadLyricsAsync(AudioInfo[] audioInfos) {
+			foreach (var audioInfo in audioInfos)
+				await TryDownloadLyricAsync(audioInfo);
+		}
+
+		#region search
 		/// <summary>
 		/// 同时根据专辑信息以及歌曲信息获取网易云音乐上的歌曲
 		/// </summary>
@@ -226,86 +238,17 @@ namespace NLyric {
 		private static async Task<NcmTrack[]> GetAlbumTracksAsync(AlbumInfo albumInfo) {
 			if (!_cachedNcmTrackses.TryGetValue(albumInfo.Id, out var ncmTracks)) {
 				var list = new List<NcmTrack>();
-				foreach (var item in await CloudMusic.GetTracksAsync(albumInfo.Id))
+				foreach (var item in await CloudMusic.GetTracksAsync(albumInfo.Id)) {
 					if ((await GetLyricAsync(item.Id)).IsCollected)
 						list.Add(item);
+				}
 				ncmTracks = list.ToArray();
-				_cachedNcmTrackses[albumInfo.Id] = ncmTracks;
+				lock (((ICollection)_cachedNcmTrackses).SyncRoot)
+					_cachedNcmTrackses[albumInfo.Id] = ncmTracks;
 			}
 			return ncmTracks;
 		}
-
-		private static void PrepareAllLyrics(AudioInfo[] audioInfos) {
-			int[] trackIds;
-
-			trackIds = audioInfos.Where(t => !(t.TrackInfo is null)).Select(t => t.TrackInfo.Id).ToArray();
-			for (int i = 0; i < trackIds.Length; i += 50) {
-				// TODO
-			}
-		}
-
-		private static async Task<bool> TryDownloadLyricAsync(AudioInfo audioInfo) {
-			string lrcPath = Path.ChangeExtension(audioInfo.Path, ".lrc");
-			bool hasLrcFile = File.Exists(lrcPath);
-			var trackInfo = audioInfo.TrackInfo;
-			NcmLyric ncmLyric;
-			try {
-				ncmLyric = await GetLyricAsync(trackInfo.Id);
-			}
-			catch (Exception ex) {
-				FastConsole.WriteException(ex);
-				return false;
-			}
-			FastConsole.WriteInfo($"正在尝试下载\"{Path.GetFileName(audioInfo.Path)} ({audioInfo.Track})\"的歌词。");
-			if (hasLrcFile) {
-				// 如果歌词存在，判断是否需要覆盖或更新
-				var lyricInfo = trackInfo.Lyric;
-				string lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllBytes(lrcPath)) : null;
-				if (!(lyricInfo is null) && lyricInfo.CheckSum == lyricCheckSum) {
-					// 歌词由NLyric创建
-					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
-						// 是最新版本
-						FastConsole.WriteInfo("本地歌词已是最新版本，正在跳过。");
-						return false;
-					}
-					else {
-						// 不是最新版本
-						if (_lyricSettings.AutoUpdate) {
-							FastConsole.WriteLine("本地歌词不是最新版本，正在更新。", ConsoleColor.Green);
-						}
-						else {
-							FastConsole.WriteLine("本地歌词不是最新版本但是自动更新被禁止，正在跳过。", ConsoleColor.Yellow);
-							return false;
-						}
-					}
-				}
-				else {
-					// 歌词非NLyric创建
-					if (_lyricSettings.Overwriting) {
-						FastConsole.WriteLine("本地歌词非NLyric创建，正在更新。", ConsoleColor.Yellow);
-					}
-					else {
-						FastConsole.WriteLine("本地歌词非NLyric创建但是覆盖被禁止，正在跳过。", ConsoleColor.Yellow);
-						return false;
-					}
-				}
-			}
-			var lrc = ToLrc(ncmLyric);
-			if (!(lrc is null)) {
-				// 歌词已收录，不是纯音乐
-				string lyric = lrc.ToString();
-				try {
-					File.WriteAllText(lrcPath, lyric, _lyricSettings.Encoding);
-				}
-				catch (Exception ex) {
-					FastConsole.WriteException(ex);
-					return false;
-				}
-				trackInfo.Lyric = new LyricInfo(ncmLyric, ComputeLyricCheckSum(_lyricSettings.Encoding.GetBytes(lyric)));
-				FastConsole.WriteLine("本地歌词下载完毕。", ConsoleColor.Magenta);
-			}
-			return true;
-		}
+		#endregion
 
 		#region map
 		/// <summary>
@@ -366,9 +309,10 @@ namespace NLyric {
 				return null;
 			}
 			var list = new List<NcmTrack>();
-			foreach (var item in ncmTracks.Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0))
+			foreach (var item in ncmTracks.Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0)) {
 				if ((await GetLyricAsync(item.Id)).IsCollected)
 					list.Add(item);
+			}
 			ncmTracks = list.ToArray();
 			return MatchByUser(ncmTracks, track);
 		}
@@ -582,10 +526,74 @@ namespace NLyric {
 		#endregion
 
 		#region lyric
+		private static async Task<bool> TryDownloadLyricAsync(AudioInfo audioInfo) {
+			string lrcPath = Path.ChangeExtension(audioInfo.Path, ".lrc");
+			bool hasLrcFile = File.Exists(lrcPath);
+			var trackInfo = audioInfo.TrackInfo;
+			NcmLyric ncmLyric;
+			try {
+				ncmLyric = await GetLyricAsync(trackInfo.Id);
+			}
+			catch (Exception ex) {
+				FastConsole.WriteException(ex);
+				return false;
+			}
+			FastConsole.WriteInfo($"正在尝试下载\"{Path.GetFileName(audioInfo.Path)} ({audioInfo.Track})\"的歌词。");
+			if (hasLrcFile) {
+				// 如果歌词存在，判断是否需要覆盖或更新
+				var lyricInfo = trackInfo.Lyric;
+				string lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllBytes(lrcPath)) : null;
+				if (!(lyricInfo is null) && lyricInfo.CheckSum == lyricCheckSum) {
+					// 歌词由NLyric创建
+					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
+						// 是最新版本
+						FastConsole.WriteInfo("本地歌词已是最新版本，正在跳过。");
+						return false;
+					}
+					else {
+						// 不是最新版本
+						if (_lyricSettings.AutoUpdate) {
+							FastConsole.WriteLine("本地歌词不是最新版本，正在更新。", ConsoleColor.Green);
+						}
+						else {
+							FastConsole.WriteLine("本地歌词不是最新版本但是自动更新被禁止，正在跳过。", ConsoleColor.Yellow);
+							return false;
+						}
+					}
+				}
+				else {
+					// 歌词非NLyric创建
+					if (_lyricSettings.Overwriting) {
+						FastConsole.WriteLine("本地歌词非NLyric创建，正在更新。", ConsoleColor.Yellow);
+					}
+					else {
+						FastConsole.WriteLine("本地歌词非NLyric创建但是覆盖被禁止，正在跳过。", ConsoleColor.Yellow);
+						return false;
+					}
+				}
+			}
+			var lrc = ToLrc(ncmLyric);
+			if (!(lrc is null)) {
+				// 歌词已收录，不是纯音乐
+				string lyric = lrc.ToString();
+				try {
+					File.WriteAllText(lrcPath, lyric, _lyricSettings.Encoding);
+				}
+				catch (Exception ex) {
+					FastConsole.WriteException(ex);
+					return false;
+				}
+				trackInfo.Lyric = new LyricInfo(ncmLyric, ComputeLyricCheckSum(_lyricSettings.Encoding.GetBytes(lyric)));
+				FastConsole.WriteLine("本地歌词下载完毕。", ConsoleColor.Magenta);
+			}
+			return true;
+		}
+
 		private static async Task<NcmLyric> GetLyricAsync(int trackId) {
 			if (!_cachedNcmLyrics.TryGetValue(trackId, out var lyric)) {
 				lyric = await CloudMusic.GetLyricAsync(trackId);
-				_cachedNcmLyrics[trackId] = lyric;
+				lock (((ICollection)_cachedNcmLyrics).SyncRoot)
+					_cachedNcmLyrics[trackId] = lyric;
 			}
 			return lyric;
 		}
@@ -676,6 +684,49 @@ namespace NLyric {
 
 		private static string ComputeLyricCheckSum(byte[] lyric) {
 			return CRC32.Compute(lyric).ToString("X8");
+		}
+		#endregion
+
+		#region accelerate
+		private static Task AccelerateAllTracksAsync(AudioInfo[] audioInfos) {
+			// TODO
+			return Task.CompletedTask;
+		}
+
+		private static async Task AccelerateAllLyricsAsync(AudioInfo[] audioInfos) {
+			const int STEP = 50;
+
+			int[] trackIds = audioInfos.Select(t => t.TrackInfo.Id).ToArray();
+			for (int i = 0; i < trackIds.Length; i += STEP) {
+				var trackIdMap = new Dictionary<string, int>(STEP);
+				var queries = new Dictionary<string, string>(STEP);
+				int kMax = i + STEP <= trackIds.Length ? STEP : trackIds.Length % STEP;
+				for (int k = 0; k < kMax; k++) {
+					string route = "/api/song/lyric" + new string('/', k);
+					trackIdMap[route] = trackIds[i + k];
+					queries[route] = JsonConvert.SerializeObject(new Dictionary<string, object> {
+						["id"] = trackIds[i + k],
+						["lv"] = -1,
+						["kv"] = -1,
+						["tv"] = -1
+					});
+				}
+				var (isOk, json) = await CloudMusic.Api.RequestAsync(CloudMusicApiProviders.Batch, queries);
+				if (!isOk) {
+					FastConsole.WriteError($"[Experimental] 歌词 {i}+{STEP} 加速失败！");
+					continue;
+				}
+				lock (((ICollection)_cachedNcmLyrics).SyncRoot) {
+					foreach (var item in trackIdMap) {
+						int trackId = item.Value;
+						if (!(json[item.Key] is JObject lyricJson)) {
+							FastConsole.WriteError($"[Experimental] 歌词 {trackId} at {i}+{STEP} 加速失败！");
+							continue;
+						}
+						_cachedNcmLyrics[trackId] = CloudMusic.ParseLyric(trackId, lyricJson);
+					}
+				}
+			}
 		}
 		#endregion
 

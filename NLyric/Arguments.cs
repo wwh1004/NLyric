@@ -3,7 +3,7 @@ using System.Cli;
 using System.IO;
 
 namespace NLyric {
-	internal sealed class Arguments {
+	public sealed class Arguments {
 		private string _directory;
 		private string _account;
 		private string _password;

@@ -12,6 +12,8 @@ namespace NLyric.Ncm {
 	public static class CloudMusic {
 		private static readonly CloudMusicApi _api = new CloudMusicApi();
 
+		public static CloudMusicApi Api => _api;
+
 		public static async Task<bool> LoginAsync(string account, string password) {
 			var queries = new Dictionary<string, string>();
 			bool isPhone = Regex.Match(account, "^[0-9]+$").Success;
@@ -38,9 +40,13 @@ namespace NLyric.Ncm {
 			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
-			json = (JObject)json["result"];
-			if (json is null)
+			if ((JObject)json["result"] is null)
 				throw new KeywordForbiddenException(string.Join(" ", keywords));
+			return ParseSearchTracks(json);
+		}
+
+		public static NcmTrack[] ParseSearchTracks(JObject json) {
+			json = (JObject)json["result"];
 			if (!(json["songs"] is JArray songs))
 				return Array.Empty<NcmTrack>();
 			return songs.Select(t => ParseTrack(t, false)).ToArray();
@@ -63,9 +69,13 @@ namespace NLyric.Ncm {
 			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Search) + " API错误");
-			json = (JObject)json["result"];
-			if (json is null)
+			if ((JObject)json["result"] is null)
 				throw new KeywordForbiddenException(string.Join(" ", keywords));
+			return ParseSearchAlbums(json);
+		}
+
+		public static NcmAlbum[] ParseSearchAlbums(JObject json) {
+			json = (JObject)json["result"];
 			if (!(json["albums"] is JArray albums))
 				return Array.Empty<NcmAlbum>();
 			// albumCount不可信，搜索"U-87 陈奕迅"返回albums有内容，但是albumCount为0
@@ -78,6 +88,10 @@ namespace NLyric.Ncm {
 			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Album) + " API错误");
+			return ParseTracks(json);
+		}
+
+		public static NcmTrack[] ParseTracks(JObject json) {
 			return json["songs"].Select(t => ParseTrack(t, true)).ToArray();
 		}
 
@@ -87,12 +101,19 @@ namespace NLyric.Ncm {
 			});
 			if (!isOk)
 				throw new ApplicationException(nameof(CloudMusicApiProviders.Lyric) + " API错误");
+			return ParseLyric(trackId, json);
+		}
+
+		public static NcmLyric ParseLyric(int trackId, JObject json) {
+			if (json is null)
+				throw new ArgumentNullException(nameof(json));
+
 			if ((bool?)json["uncollected"] == true)
-				// 未收录
 				return new NcmLyric(trackId, false, false, null, 0, null, 0);
+			// 未收录
 			if ((bool?)json["nolyric"] == true)
-				// 纯音乐
 				return new NcmLyric(trackId, true, true, null, 0, null, 0);
+			// 纯音乐
 			var (rawLrc, rawVersion) = ParseLyric(json["lrc"]);
 			var (translatedLrc, translatedVersion) = ParseLyric(json["tlyric"]);
 			return new NcmLyric(trackId, true, false, rawLrc, rawVersion, translatedLrc, translatedVersion);
