@@ -113,14 +113,19 @@ namespace NLyric {
 				finally {
 					audioFile?.Dispose();
 				}
-				var trackInfo = _database.TrackInfos.Match(audioInfo.Album, audioInfo.Track);
+				TrackInfo trackInfo;
+				lock (_database.TrackInfos)
+					trackInfo = _database.TrackInfos.Match(audioInfo.Album, audioInfo.Track);
 				if (!(trackInfo is null)) {
 					audioInfo.TrackInfo = trackInfo;
 					return audioInfo;
 				}
 				// 尝试从数据库获取歌曲
 				if (The163KeyHelper.TryGetTrackId(tag, out int trackId)) {
-					audioInfo.TrackInfo = new TrackInfo(audioInfo.Track, audioInfo.Album, trackId);
+					trackInfo = new TrackInfo(audioInfo.Track, audioInfo.Album, trackId);
+					lock (_database.TrackInfos)
+						_database.TrackInfos.Add(trackInfo);
+					audioInfo.TrackInfo = trackInfo;
 					return audioInfo;
 				}
 				// 尝试从163Key获取ID
@@ -145,6 +150,7 @@ namespace NLyric {
 				else {
 					FastConsole.WriteInfo($"已获取文件\"{Path.GetFileName(candidate.Path)}\"的网易云音乐ID: {trackInfo.Id}。");
 					candidate.TrackInfo = new TrackInfo(candidate.Track, candidate.Album, trackInfo.Id);
+					_database.TrackInfos.Add(candidate.TrackInfo);
 				}
 				callback?.Invoke(candidate);
 				FastConsole.WriteNewLine();
@@ -696,7 +702,7 @@ namespace NLyric {
 		}
 
 		private static async Task AccelerateAllLyricsAsync(AudioInfo[] audioInfos) {
-			const int STEP = 50;
+			const int STEP = 100;
 
 			int[] trackIds = audioInfos.Select(t => t.TrackInfo.Id).ToArray();
 			for (int i = 0; i < trackIds.Length; i += STEP) {
