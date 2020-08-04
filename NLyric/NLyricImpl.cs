@@ -295,7 +295,7 @@ namespace NLyric {
 				// 歌词已收录，不是纯音乐
 				string lyric = lrc.ToString();
 				try {
-					File.WriteAllText(lrcPath, lyric);
+					File.WriteAllText(lrcPath, lyric, _lyricSettings.Encoding);
 				}
 				catch (Exception ex) {
 					FastConsole.WriteException(ex);
