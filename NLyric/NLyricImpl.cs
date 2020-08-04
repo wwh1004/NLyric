@@ -28,23 +28,18 @@ namespace NLyric {
 		private static NLyricDatabase _database;
 
 		public static async Task ExecuteAsync(Arguments arguments) {
-			Task loginTask;
-			string databasePath;
-			AudioInfo[] audioInfos;
-
 			FastConsole.WriteLine("程序会自动过滤相似度为0的结果与歌词未被收集的结果！！！", ConsoleColor.Green);
-			loginTask = LoginIfNeedAsync(arguments);
-			databasePath = Path.Combine(arguments.Directory, ".nlyric");
+			var loginTask = LoginIfNeedAsync(arguments);
+			string databasePath = Path.Combine(arguments.Directory, ".nlyric");
 			LoadDatabase(databasePath);
-			audioInfos = LoadAllAudioInfos(arguments.Directory);
+			var audioInfos = LoadAllAudioInfos(arguments.Directory);
 			await loginTask;
 			// 登录同时进行
-			foreach (AudioInfo audioInfo in audioInfos) {
-				TrackInfo trackInfo;
-
+			foreach (var audioInfo in audioInfos) {
 				if (!(audioInfo.TrackInfo is null))
 					continue;
 				FastConsole.WriteInfo($"开始获取文件\"{Path.GetFileName(audioInfo.Path)}\"的网易云音乐ID。");
+				TrackInfo trackInfo;
 				try {
 					trackInfo = await SearchTrackAsync(audioInfo.Album, audioInfo.Track);
 				}
@@ -63,7 +58,7 @@ namespace NLyric {
 			}
 			if (arguments.UseBatch)
 				PrepareAllLyrics(audioInfos);
-			foreach (AudioInfo audioInfo in audioInfos)
+			foreach (var audioInfo in audioInfos)
 				if (!(audioInfo.TrackInfo is null))
 					await TryDownloadLyricAsync(audioInfo);
 			SaveDatabase(databasePath);
@@ -71,8 +66,7 @@ namespace NLyric {
 
 		private static async Task LoginIfNeedAsync(Arguments arguments) {
 			if (string.IsNullOrEmpty(arguments.Account) || string.IsNullOrEmpty(arguments.Password)) {
-				for (int i = 0; i < 3; i++)
-					FastConsole.WriteLine("登录可避免出现大部分API错误！！！当前是免登录状态，若软件出错请尝试登录！！！", ConsoleColor.Green);
+				FastConsole.WriteLine("登录可避免出现大部分API错误！！！当前是免登录状态，若软件出错请尝试登录！！！", ConsoleColor.Green);
 				FastConsole.WriteLine("强烈建议登录使用软件：\"NLyric.exe -d C:\\Music -a example@example.com -p 123456\"", ConsoleColor.Green);
 			}
 			else {
@@ -92,9 +86,7 @@ namespace NLyric {
 		}
 
 		private static bool CanSkip(string audioPath, string lrcPath) {
-			string extension;
-
-			extension = Path.GetExtension(audioPath);
+			string extension = Path.GetExtension(audioPath);
 			if (!IsAudioFile(extension))
 				return true;
 			if (File.Exists(lrcPath) && !_lyricSettings.AutoUpdate && !_lyricSettings.Overwriting) {
@@ -115,16 +107,11 @@ namespace NLyric {
 				lrcPath = Path.ChangeExtension(audioPath, ".lrc");
 				return !CanSkip(audioPath, lrcPath);
 			}).AsParallel().AsOrdered().Select(audioPath => {
-				TagLib.File audioFile;
-				Tag tag;
-				AudioInfo audioInfo;
-				TrackInfo trackInfo;
-				int trackId;
-
-				audioFile = null;
-				audioInfo = new AudioInfo {
+				var audioFile = default(TagLib.File);
+				var audioInfo = new AudioInfo {
 					Path = audioPath
 				};
+				var tag = default(Tag);
 				try {
 					audioFile = TagLib.File.Create(audioPath);
 					tag = audioFile.Tag;
@@ -140,13 +127,13 @@ namespace NLyric {
 				finally {
 					audioFile?.Dispose();
 				}
-				trackInfo = _database.TrackInfos.Match(audioInfo.Album, audioInfo.Track);
+				var trackInfo = _database.TrackInfos.Match(audioInfo.Album, audioInfo.Track);
 				if (!(trackInfo is null)) {
 					audioInfo.TrackInfo = trackInfo;
 					return audioInfo;
 				}
 				// 尝试从数据库获取歌曲
-				if (The163KeyHelper.TryGetTrackId(tag, out trackId)) {
+				if (The163KeyHelper.TryGetTrackId(tag, out int trackId)) {
 					audioInfo.TrackInfo = new TrackInfo(audioInfo.Track, audioInfo.Album, trackId);
 					return audioInfo;
 				}
@@ -162,33 +149,31 @@ namespace NLyric {
 		/// <param name="track"></param>
 		/// <returns></returns>
 		private static async Task<TrackInfo> SearchTrackAsync(Album album, Track track) {
-			AlbumInfo albumInfo;
-			int trackId;
-			NcmTrack ncmTrack;
-			bool byUser;
-			TrackInfo trackInfo;
-
-			albumInfo = album is null ? null : await SearchAlbumAsync(album);
+			var albumInfo = album is null ? null : await SearchAlbumAsync(album);
 			// 尝试获取专辑信息
+			var ncmTrack = default(NcmTrack);
 			if (!(albumInfo is null)) {
-				// 网易云音乐收录了歌曲所在专辑
-				NcmTrack[] ncmTracks;
-
-				ncmTracks = (await GetAlbumTracksAsync(albumInfo)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
+				// 网易云音乐收录了歌曲所在专辑	
+				var ncmTracks = (await GetAlbumTracksAsync(albumInfo)).Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0).ToArray();
 				// 获取网易云音乐上专辑收录的歌曲
 				ncmTrack = MatchByUser(ncmTracks, track);
 			}
-			else
+			else {
 				ncmTrack = null;
+			}
 			if (ncmTrack is null)
-				// 没有对应的专辑信息，使用无专辑匹配，或者网易云音乐上的专辑可能没收录这个歌曲，不清楚为什么，但是确实存在这个情况，比如专辑id:3094396
 				ncmTrack = await MapToAsync(track);
-			if (ncmTrack is null)
+			// 没有对应的专辑信息，使用无专辑匹配，或者网易云音乐上的专辑可能没收录这个歌曲，不清楚为什么，但是确实存在这个情况，比如专辑id:3094396
+			bool byUser;
+			int trackId;
+			if (ncmTrack is null) {
 				byUser = GetIdByUser("歌曲", out trackId);
+			}
 			else {
 				byUser = false;
 				trackId = 0;
 			}
+			var trackInfo = default(TrackInfo);
 			if (ncmTrack is null && !byUser) {
 				trackInfo = null;
 				FastConsole.WriteWarning("歌曲匹配失败！");
@@ -207,23 +192,20 @@ namespace NLyric {
 		/// <param name="album"></param>
 		/// <returns></returns>
 		private static async Task<AlbumInfo> SearchAlbumAsync(Album album) {
-			AlbumInfo albumInfo;
-			string replacedAlbumName;
-			NcmAlbum ncmAlbum;
-			bool byUser;
-			int albumId;
-
-			albumInfo = _database.AlbumInfos.Match(album);
+			var albumInfo = _database.AlbumInfos.Match(album);
 			if (!(albumInfo is null))
 				return albumInfo;
 			// 先尝试从数据库获取专辑
-			replacedAlbumName = album.Name.ReplaceEx();
+			string replacedAlbumName = album.Name.ReplaceEx();
 			if (_failMatchAlbums.Contains(replacedAlbumName))
 				return null;
 			// 防止不停重复匹配一个专辑
-			ncmAlbum = await MapToAsync(album);
-			if (ncmAlbum is null)
+			var ncmAlbum = await MapToAsync(album);
+			bool byUser;
+			int albumId;
+			if (ncmAlbum is null) {
 				byUser = GetIdByUser("专辑", out albumId);
+			}
 			else {
 				byUser = false;
 				albumId = 0;
@@ -241,13 +223,9 @@ namespace NLyric {
 		}
 
 		private static async Task<NcmTrack[]> GetAlbumTracksAsync(AlbumInfo albumInfo) {
-			NcmTrack[] ncmTracks;
-
-			if (!_cachedNcmTrackses.TryGetValue(albumInfo.Id, out ncmTracks)) {
-				List<NcmTrack> list;
-
-				list = new List<NcmTrack>();
-				foreach (NcmTrack item in await CloudMusic.GetTracksAsync(albumInfo.Id))
+			if (!_cachedNcmTrackses.TryGetValue(albumInfo.Id, out var ncmTracks)) {
+				var list = new List<NcmTrack>();
+				foreach (var item in await CloudMusic.GetTracksAsync(albumInfo.Id))
 					if ((await GetLyricAsync(item.Id)).IsCollected)
 						list.Add(item);
 				ncmTracks = list.ToArray();
@@ -266,17 +244,11 @@ namespace NLyric {
 		}
 
 		private static async Task<bool> TryDownloadLyricAsync(AudioInfo audioInfo) {
-			string lrcPath;
-			bool hasLrcFile;
-			string lyricCheckSum;
-			TrackInfo trackInfo;
+			string lrcPath = Path.ChangeExtension(audioInfo.Path, ".lrc");
+			bool hasLrcFile = File.Exists(lrcPath);
+			string lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllText(lrcPath)) : null;
+			var trackInfo = audioInfo.TrackInfo;
 			NcmLyric ncmLyric;
-			Lrc lrc;
-
-			lrcPath = Path.ChangeExtension(audioInfo.Path, ".lrc");
-			hasLrcFile = File.Exists(lrcPath);
-			lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllText(lrcPath)) : null;
-			trackInfo = audioInfo.TrackInfo;
 			try {
 				ncmLyric = await GetLyricAsync(trackInfo.Id);
 			}
@@ -287,9 +259,7 @@ namespace NLyric {
 			FastConsole.WriteInfo($"正在尝试下载\"{Path.GetFileName(audioInfo.Path)} ({audioInfo.Track})\"的歌词。");
 			if (hasLrcFile) {
 				// 如果歌词存在，判断是否需要覆盖或更新
-				LyricInfo lyricInfo;
-
-				lyricInfo = trackInfo.Lyric;
+				var lyricInfo = trackInfo.Lyric;
 				if (!(lyricInfo is null) && lyricInfo.CheckSum == lyricCheckSum) {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
@@ -317,12 +287,10 @@ namespace NLyric {
 					}
 				}
 			}
-			lrc = ToLrc(ncmLyric);
+			var lrc = ToLrc(ncmLyric);
 			if (!(lrc is null)) {
 				// 歌词已收录，不是纯音乐
-				string lyric;
-
-				lyric = lrc.ToString();
+				string lyric = lrc.ToString();
 				try {
 					File.WriteAllText(lrcPath, lyric);
 				}
@@ -346,11 +314,9 @@ namespace NLyric {
 			if (track is null)
 				throw new ArgumentNullException(nameof(track));
 
-			NcmTrack ncmTrack;
-
 			FastConsole.WriteInfo($"开始搜索歌曲\"{track}\"。");
 			FastConsole.WriteWarning("正在尝试带艺术家搜索，结果可能将过少！");
-			ncmTrack = await MapToAsync(track, true);
+			var ncmTrack = await MapToAsync(track, true);
 			if (ncmTrack is null && _fuzzySettings.TryIgnoringArtists) {
 				FastConsole.WriteWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
 				ncmTrack = await MapToAsync(track, false);
@@ -367,11 +333,9 @@ namespace NLyric {
 			if (album is null)
 				throw new ArgumentNullException(nameof(album));
 
-			NcmAlbum ncmAlbum;
-
 			FastConsole.WriteInfo($"开始搜索专辑\"{album}\"。");
 			FastConsole.WriteWarning("正在尝试带艺术家搜索，结果可能将过少！");
-			ncmAlbum = await MapToAsync(album, true);
+			var ncmAlbum = await MapToAsync(album, true);
 			if (ncmAlbum is null && _fuzzySettings.TryIgnoringArtists) {
 				FastConsole.WriteWarning("正在尝试忽略艺术家搜索，结果可能将不精确！");
 				ncmAlbum = await MapToAsync(album, false);
@@ -386,9 +350,7 @@ namespace NLyric {
 		/// <param name="withArtists">是否带艺术家搜索</param>
 		/// <returns></returns>
 		private static async Task<NcmTrack> MapToAsync(Track track, bool withArtists) {
-			NcmTrack[] ncmTracks;
-			List<NcmTrack> list;
-
+			var ncmTracks = default(NcmTrack[]);
 			try {
 				ncmTracks = await CloudMusic.SearchTrackAsync(track, _searchSettings.Limit, withArtists);
 			}
@@ -400,8 +362,8 @@ namespace NLyric {
 				FastConsole.WriteException(ex2);
 				return null;
 			}
-			list = new List<NcmTrack>();
-			foreach (NcmTrack item in ncmTracks.Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0))
+			var list = new List<NcmTrack>();
+			foreach (var item in ncmTracks.Where(t => ComputeSimilarity(t.Name, track.Name, false) != 0))
 				if ((await GetLyricAsync(item.Id)).IsCollected)
 					list.Add(item);
 			ncmTracks = list.ToArray();
@@ -415,8 +377,7 @@ namespace NLyric {
 		/// <param name="withArtists">是否带艺术家搜索</param>
 		/// <returns></returns>
 		private static async Task<NcmAlbum> MapToAsync(Album album, bool withArtists) {
-			NcmAlbum[] ncmAlbums;
-
+			var ncmAlbums = default(NcmAlbum[]);
 			try {
 				ncmAlbums = await CloudMusic.SearchAlbumAsync(album, _searchSettings.Limit, withArtists);
 			}
@@ -439,8 +400,10 @@ namespace NLyric {
 				_database = JsonConvert.DeserializeObject<NLyricDatabase>(File.ReadAllText(databasePath));
 				if (!_database.CheckFormatVersion())
 					throw new InvalidOperationException("尝试加载新格式数据库。");
-				if (_database.IsOldFormat())
+
+				if (_database.IsOldFormat()) {
 					FastConsole.WriteWarning("不兼容的老格式数据库，将被覆盖重建！");
+				}
 				else {
 					SortDatabase();
 					FastConsole.WriteInfo($"搜索数据库\"{databasePath}\"加载成功。");
@@ -448,6 +411,7 @@ namespace NLyric {
 					return;
 				}
 			}
+
 			_database = new NLyricDatabase() {
 				AlbumInfos = new List<AlbumInfo>(),
 				TrackInfos = new List<TrackInfo>(),
@@ -471,16 +435,16 @@ namespace NLyric {
 		}
 
 		private static void SaveDatabaseCore(string databasePath) {
-			using (FileStream stream = new FileStream(databasePath, FileMode.OpenOrCreate))
-			using (StreamWriter writer = new StreamWriter(stream))
+			using (var stream = new FileStream(databasePath, FileMode.OpenOrCreate))
+			using (var writer = new StreamWriter(stream))
 				writer.Write(FormatJson(JsonConvert.SerializeObject(_database)));
 		}
 
 		private static string FormatJson(string json) {
-			using (StringWriter writer = new StringWriter())
-			using (JsonTextWriter jsonWriter = new JsonTextWriter(writer) { Formatting = Formatting.Indented })
-			using (StringReader reader = new StringReader(json))
-			using (JsonTextReader jsonReader = new JsonTextReader(reader)) {
+			using (var writer = new StringWriter())
+			using (var jsonWriter = new JsonTextWriter(writer) { Formatting = Formatting.Indented })
+			using (var reader = new StringReader(json))
+			using (var jsonReader = new JsonTextReader(reader)) {
 				jsonWriter.WriteToken(jsonReader);
 				return writer.ToString();
 			}
@@ -489,48 +453,43 @@ namespace NLyric {
 
 		#region match
 		private static TSource MatchByUser<TSource, TTarget>(TSource[] sources, TTarget target) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
-			TSource result;
-
 			if (sources.Length == 0)
 				return null;
-			result = MatchByUser(sources, target, false);
-
+			var result = MatchByUser(sources, target, false);
 			if (result is null && _fuzzySettings.TryIgnoringExtraInfo)
 				result = MatchByUser(sources, target, true);
 			return result;
 		}
 
 		private static TSource MatchByUser<TSource, TTarget>(TSource[] sources, TTarget target, bool fuzzy) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
-			Dictionary<TSource, double> nameSimilarities;
-			TSource result;
-
 			if (sources.Length == 0)
 				return null;
-			result = MatchExactly(sources, target, fuzzy);
+
+			var result = MatchExactly(sources, target, fuzzy);
 			if (!fuzzy || !(result is null))
-				// 不是fuzzy模式或者result不为空，可以直接返回结果，不需要用户选择了
 				return result;
-			nameSimilarities = new Dictionary<TSource, double>();
-			foreach (TSource source in sources)
+			// 不是fuzzy模式或者result不为空，可以直接返回结果，不需要用户选择了
+
+			var nameSimilarities = new Dictionary<TSource, double>();
+			foreach (var source in sources)
 				nameSimilarities[source] = ComputeSimilarity(source.Name, target.Name, fuzzy);
-			return Select(sources.Where(t => nameSimilarities[t] > _matchSettings.MinimumSimilarity).OrderByDescending(t => t, new DictionaryComparer<TSource, double>(nameSimilarities)).ToArray(), target, nameSimilarities);
+			return Select(sources.Where(t => nameSimilarities[t] > _matchSettings.MinimumSimilarity).OrderByDescending(t => nameSimilarities[t]).ToArray(), target, nameSimilarities);
 		}
 
 		private static TSource MatchExactly<TSource, TTarget>(TSource[] sources, TTarget target, bool fuzzy) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
-			foreach (TSource source in sources) {
-				string x;
-				string y;
-
-				x = source.Name;
-				y = target.Name;
+			foreach (var source in sources) {
+				string x = source.Name;
+				string y = target.Name;
 				if (fuzzy) {
 					x = x.Fuzzy();
 					y = y.Fuzzy();
 				}
+
 				if (x != y)
 					goto not_equal;
 				if (source.Artists.Count != target.Artists.Count)
 					goto not_equal;
+
 				for (int i = 0; i < source.Artists.Count; i++) {
 					x = source.Artists[i];
 					y = target.Artists[i];
@@ -542,6 +501,7 @@ namespace NLyric {
 						goto not_equal;
 				}
 				return source;
+
 			not_equal:
 				continue;
 			}
@@ -549,18 +509,14 @@ namespace NLyric {
 		}
 
 		private static TSource Select<TSource, TTarget>(TSource[] sources, TTarget target, Dictionary<TSource, double> nameSimilarities) where TSource : class, ITrackOrAlbum where TTarget : class, ITrackOrAlbum {
-			TSource result;
-
 			if (sources.Length == 0)
 				return null;
+
 			FastConsole.WriteInfo("请手动输入1,2,3...选择匹配的项，若不存在，请直接按下回车键。");
 			FastConsole.WriteInfo("对比项：" + TrackOrAlbumToString(target));
 			for (int i = 0; i < sources.Length; i++) {
-				double nameSimilarity;
-				string text;
-
-				nameSimilarity = nameSimilarities[sources[i]];
-				text = $"{i + 1}. {sources[i]} (s:{nameSimilarity.ToString("F2")})";
+				double nameSimilarity = nameSimilarities[sources[i]];
+				string text = $"{i + 1}. {sources[i]} (s:{nameSimilarity:F2})";
 				if (nameSimilarity >= 0.85)
 					FastConsole.WriteLine(text, ConsoleColor.Green);
 				else if (nameSimilarity >= 0.5)
@@ -568,15 +524,13 @@ namespace NLyric {
 				else
 					FastConsole.WriteInfo(text);
 			}
-			result = null;
-			do {
-				string userInput;
-				int index;
 
-				userInput = FastConsole.ReadLine().Trim();
+			var result = default(TSource);
+			do {
+				string userInput = FastConsole.ReadLine().Trim();
 				if (userInput.Length == 0)
 					break;
-				if (int.TryParse(userInput, out index)) {
+				if (int.TryParse(userInput, out int index)) {
 					index -= 1;
 					if (index >= 0 && index < sources.Length) {
 						result = sources[index];
@@ -585,6 +539,7 @@ namespace NLyric {
 				}
 				FastConsole.WriteWarning("输入有误，请重新输入！");
 			} while (true);
+
 			if (!(result is null))
 				FastConsole.WriteInfo("已选择：" + result.ToString());
 			return result;
@@ -611,9 +566,7 @@ namespace NLyric {
 		private static bool GetIdByUser(string s, out int id) {
 			FastConsole.WriteInfo($"请输入{s}的网易云音乐ID，若不存在，请直接按下回车键。");
 			do {
-				string userInput;
-
-				userInput = FastConsole.ReadLine().Trim();
+				string userInput = FastConsole.ReadLine().Trim();
 				if (userInput.Length == 0)
 					break;
 				if (int.TryParse(userInput, out id))
@@ -627,9 +580,7 @@ namespace NLyric {
 
 		#region lyric
 		private static async Task<NcmLyric> GetLyricAsync(int trackId) {
-			NcmLyric lyric;
-
-			if (!_cachedNcmLyrics.TryGetValue(trackId, out lyric)) {
+			if (!_cachedNcmLyrics.TryGetValue(trackId, out var lyric)) {
 				lyric = await CloudMusic.GetLyricAsync(trackId);
 				_cachedNcmLyrics[trackId] = lyric;
 			}
@@ -645,10 +596,12 @@ namespace NLyric {
 				FastConsole.WriteWarning("当前歌曲是纯音乐无歌词！");
 				return null;
 			}
+
 			if (!(lyric.Raw is null))
 				NormalizeLyric(lyric.Raw, false);
 			if (!(lyric.Translated is null))
 				NormalizeLyric(lyric.Translated, _lyricSettings.SimplifyTranslated);
+
 			foreach (string mode in _lyricSettings.Modes) {
 				switch (mode.ToUpperInvariant()) {
 				case "MERGED":
@@ -656,32 +609,32 @@ namespace NLyric {
 						continue;
 					FastConsole.WriteInfo("已获取混合歌词。");
 					return MergeLyric(lyric.Raw, lyric.Translated);
+
 				case "RAW":
 					if (lyric.Raw is null)
 						continue;
 					FastConsole.WriteInfo("已获取原始歌词。");
 					return lyric.Raw;
+
 				case "TRANSLATED":
 					if (lyric.Translated is null)
 						continue;
 					FastConsole.WriteInfo("已获取翻译歌词。");
 					return lyric.Translated;
+
 				default:
 					throw new ArgumentOutOfRangeException(nameof(mode));
 				}
 			}
+
 			FastConsole.WriteWarning("获取歌词失败（可能歌曲是纯音乐但是未被网易云音乐标记为纯音乐）。");
 			return null;
 		}
 
 		private static void NormalizeLyric(Lrc lrc, bool simplify) {
-			Dictionary<TimeSpan, string> newLyrics;
-
-			newLyrics = new Dictionary<TimeSpan, string>(lrc.Lyrics.Count);
-			foreach (KeyValuePair<TimeSpan, string> lyric in lrc.Lyrics) {
-				string value;
-
-				value = lyric.Value.Trim('/', ' ');
+			var newLyrics = new Dictionary<TimeSpan, string>(lrc.Lyrics.Count);
+			foreach (var lyric in lrc.Lyrics) {
+				string value = lyric.Value.Trim('/', ' ');
 				if (simplify)
 					value = ChineseConverter.TraditionalToSimplified(value);
 				newLyrics.Add(lyric.Key, value);
@@ -690,36 +643,36 @@ namespace NLyric {
 		}
 
 		private static Lrc MergeLyric(Lrc rawLrc, Lrc translatedLrc) {
-			Lrc mergedLrc;
-
-			mergedLrc = new Lrc {
+			var mergedLrc = new Lrc {
 				Offset = rawLrc.Offset,
 				Title = rawLrc.Title
 			};
-			foreach (KeyValuePair<TimeSpan, string> rawLyric in rawLrc.Lyrics)
-				mergedLrc.Lyrics.Add(rawLyric.Key, rawLyric.Value);
-			foreach (KeyValuePair<TimeSpan, string> translatedLyric in translatedLrc.Lyrics) {
-				string rawLyric;
 
+			foreach (var rawLyric in rawLrc.Lyrics)
+				mergedLrc.Lyrics.Add(rawLyric.Key, rawLyric.Value);
+
+			foreach (var translatedLyric in translatedLrc.Lyrics) {
 				if (translatedLyric.Value.Length == 0)
-					// 如果翻译歌词是空字符串，跳过
 					continue;
-				if (!mergedLrc.Lyrics.ContainsKey(translatedLyric.Key)) {
-					// 如果没有对应的未翻译字符串，直接添加
+				// 如果翻译歌词是空字符串，跳过
+
+				if (!string.IsNullOrEmpty(translatedLyric.Value) && !mergedLrc.Lyrics.ContainsKey(translatedLyric.Key)) {
+					// 如果有翻译歌词并且没有对应的未翻译歌词，直接添加
 					mergedLrc.Lyrics.Add(translatedLyric.Key, translatedLyric.Value);
 					continue;
 				}
-				rawLyric = mergedLrc.Lyrics[translatedLyric.Key];
-				if (rawLyric.Length == 0)
-					// 如果未翻译歌词是空字符串，表示上一句歌词的结束，那么跳过
-					continue;
-				mergedLrc.Lyrics[translatedLyric.Key] = $"{rawLyric} 「{translatedLyric.Value}」";
+
+				string rawLyric = mergedLrc.Lyrics[translatedLyric.Key];
+				if (rawLyric.Length != 0)
+					mergedLrc.Lyrics[translatedLyric.Key] = $"{rawLyric} 「{translatedLyric.Value}」";
+				// 如果未翻译歌词是空字符串，表示上一句歌词的结束，那么跳过
 			}
+
 			return mergedLrc;
 		}
 
 		private static string ComputeLyricCheckSum(string lyric) {
-			return Crc32.Compute(Encoding.Unicode.GetBytes(lyric)).ToString("X8");
+			return CRC32_.Compute(Encoding.Unicode.GetBytes(lyric)).ToString("X8");
 		}
 		#endregion
 

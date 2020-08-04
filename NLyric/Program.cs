@@ -15,14 +15,12 @@ namespace NLyric {
 				return;
 			}
 
-			Arguments arguments;
-
 			try {
 				Console.Title = GetTitle();
 			}
 			catch {
 			}
-			if (!CommandLine.TryParse(args, out arguments)) {
+			if (!CommandLine.TryParse(args, out Arguments arguments)) {
 				CommandLine.ShowUsage<Arguments>();
 				return;
 			}
@@ -30,7 +28,7 @@ namespace NLyric {
 			await NLyricImpl.ExecuteAsync(arguments);
 			FastConsole.WriteLine("完成", ConsoleColor.Green);
 			FastConsole.Synchronize();
-			if (IsN00bUser() || Debugger.IsAttached) {
+			if (Debugger.IsAttached) {
 				Console.WriteLine("按任意键继续...");
 				try {
 					Console.ReadKey(true);
@@ -41,45 +39,17 @@ namespace NLyric {
 		}
 
 		private static string GetTitle() {
-			string productName;
-			string version;
-			string copyright;
-			int firstBlankIndex;
-			string copyrightOwnerName;
-			string copyrightYear;
-
-			productName = GetAssemblyAttribute<AssemblyProductAttribute>().Product;
-			version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-			copyright = GetAssemblyAttribute<AssemblyCopyrightAttribute>().Copyright.Substring(12);
-			firstBlankIndex = copyright.IndexOf(' ');
-			copyrightOwnerName = copyright.Substring(firstBlankIndex + 1);
-			copyrightYear = copyright.Substring(0, firstBlankIndex);
+			string productName = GetAssemblyAttribute<AssemblyProductAttribute>().Product;
+			string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+			string copyright = GetAssemblyAttribute<AssemblyCopyrightAttribute>().Copyright.Substring(12);
+			int firstBlankIndex = copyright.IndexOf(' ');
+			string copyrightOwnerName = copyright.Substring(firstBlankIndex + 1);
+			string copyrightYear = copyright.Substring(0, firstBlankIndex);
 			return $"{productName} v{version} by {copyrightOwnerName} {copyrightYear}";
 		}
 
 		private static T GetAssemblyAttribute<T>() {
 			return (T)Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(T), false)[0];
-		}
-
-		private static bool IsN00bUser() {
-			if (HasEnv("VisualStudioDir"))
-				return false;
-			if (HasEnv("SHELL"))
-				return false;
-			return HasEnv("windir") && !HasEnv("PROMPT");
-		}
-
-		private static bool HasEnv(string name) {
-			foreach (object key in Environment.GetEnvironmentVariables().Keys) {
-				string env;
-
-				env = key as string;
-				if (env == null)
-					continue;
-				if (string.Equals(env, name, StringComparison.OrdinalIgnoreCase))
-					return true;
-			}
-			return false;
 		}
 	}
 }

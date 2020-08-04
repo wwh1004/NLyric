@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using NLyric.Settings;
@@ -9,11 +8,6 @@ namespace NLyric {
 		private static readonly SearchSettings _searchSettings = AllSettings.Default.Search;
 		private static readonly FuzzySettings _fuzzySettings = AllSettings.Default.Fuzzy;
 		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
-
-		/// <summary>
-		/// 二进制比较器
-		/// </summary>
-		public static IComparer<string> OrdinalComparer => StringOrdinalComparer.Instance;
 
 		/// <summary>
 		/// 获取非空字符串，并且清除首尾空格
@@ -47,9 +41,10 @@ namespace NLyric {
 
 			if (value.Length == 0)
 				return value;
-			foreach (KeyValuePair<string, string> pair in _searchSettings.WholeWordReplace)
+			foreach (var pair in _searchSettings.WholeWordReplace) {
 				if (value.Equals(pair.Key, StringComparison.OrdinalIgnoreCase))
 					return pair.Value;
+			}
 			return value;
 		}
 
@@ -62,16 +57,16 @@ namespace NLyric {
 			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
-			StringBuilder buffer;
-
 			if (value.Length == 0)
 				return value;
-			buffer = new StringBuilder(value);
-			for (int i = 0; i < buffer.Length; i++)
-				foreach (KeyValuePair<char, char> pair in _matchSettings.CharReplace)
-					if (buffer[i] == pair.Key)
-						buffer[i] = pair.Value;
-			return buffer.ToString();
+			var sb = new StringBuilder(value);
+			for (int i = 0; i < sb.Length; i++) {
+				foreach (var pair in _matchSettings.CharReplace) {
+					if (sb[i] == pair.Key)
+						sb[i] = pair.Value;
+				}
+			}
+			return sb.ToString();
 		}
 
 		/// <summary>
@@ -83,13 +78,9 @@ namespace NLyric {
 			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
-			int fuzzyStartIndex;
-
-			fuzzyStartIndex = -1;
+			int fuzzyStartIndex = -1;
 			while ((fuzzyStartIndex = value.IndexOfAny(_fuzzySettings.ExtraInfoStart, fuzzyStartIndex + 1)) != -1) {
-				string extraInfo;
-
-				extraInfo = value.Substring(fuzzyStartIndex + 1);
+				string extraInfo = value.Substring(fuzzyStartIndex + 1);
 				if (Enumerable.Concat(_fuzzySettings.Covers, _fuzzySettings.Featurings).Any(s => extraInfo.StartsWith(s, StringComparison.OrdinalIgnoreCase)))
 					return value.Substring(0, fuzzyStartIndex).TrimEnd();
 			}
@@ -117,9 +108,7 @@ namespace NLyric {
 			if (value is null)
 				throw new ArgumentNullException(nameof(value));
 
-			char[] chars;
-
-			chars = value.ToCharArray();
+			char[] chars = value.ToCharArray();
 			for (int i = 0; i < chars.Length; i++) {
 				if (chars[i] == '\u3000')
 					chars[i] = '\u0020';
@@ -127,19 +116,6 @@ namespace NLyric {
 					chars[i] = (char)(chars[i] - 0xFEE0);
 			}
 			return new string(chars);
-		}
-
-		private sealed class StringOrdinalComparer : IComparer<string> {
-			private static readonly StringOrdinalComparer _instance = new StringOrdinalComparer();
-
-			public static StringOrdinalComparer Instance => _instance;
-
-			private StringOrdinalComparer() {
-			}
-
-			public int Compare(string x, string y) {
-				return string.CompareOrdinal(x, y);
-			}
 		}
 	}
 }

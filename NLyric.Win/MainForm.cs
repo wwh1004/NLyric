@@ -13,19 +13,12 @@ namespace NLyric.Win {
 		}
 
 		private static string GetTitle(Assembly assembly) {
-			string productName;
-			string version;
-			string copyright;
-			int firstBlankIndex;
-			string copyrightOwnerName;
-			string copyrightYear;
-
-			productName = GetAssemblyAttribute<AssemblyProductAttribute>(assembly).Product;
-			version = assembly.GetName().Version.ToString();
-			copyright = GetAssemblyAttribute<AssemblyCopyrightAttribute>(assembly).Copyright.Substring(12);
-			firstBlankIndex = copyright.IndexOf(' ');
-			copyrightOwnerName = copyright.Substring(firstBlankIndex + 1);
-			copyrightYear = copyright.Substring(0, firstBlankIndex);
+			string productName = GetAssemblyAttribute<AssemblyProductAttribute>(assembly).Product;
+			string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+			string copyright = GetAssemblyAttribute<AssemblyCopyrightAttribute>(assembly).Copyright.Substring(12);
+			int firstBlankIndex = copyright.IndexOf(' ');
+			string copyrightOwnerName = copyright.Substring(firstBlankIndex + 1);
+			string copyrightYear = copyright.Substring(0, firstBlankIndex);
 			return $"{productName} v{version} by {copyrightOwnerName} {copyrightYear}";
 		}
 
@@ -34,7 +27,7 @@ namespace NLyric.Win {
 		}
 
 		private void _btnSetDirectory_Click(object sender, EventArgs e) {
-			using (FolderBrowserDialog dialog = new FolderBrowserDialog { ShowNewFolderButton = false }) {
+			using (var dialog = new FolderBrowserDialog { ShowNewFolderButton = false }) {
 				if (dialog.ShowDialog() != DialogResult.OK)
 					return;
 				_tbDirectory.Text = dialog.SelectedPath;
@@ -42,9 +35,7 @@ namespace NLyric.Win {
 		}
 
 		private void _cbLogin_CheckedChanged(object sender, EventArgs e) {
-			bool state;
-
-			state = _cbLogin.Checked;
+			bool state = _cbLogin.Checked;
 			_tbAccount.Enabled = state;
 			_tbPassword.Enabled = state;
 			if (state) {
@@ -52,13 +43,12 @@ namespace NLyric.Win {
 					_tbAccount.Text = string.Empty;
 				if (_tbPassword.Text == "网易云音乐密码")
 					_tbPassword.Text = string.Empty;
+				_tbPassword.PasswordChar = '*';
 			}
 		}
 
 		private void _btnRun_Click(object sender, EventArgs e) {
-			string arguments;
-
-			arguments = $"-d \"{_tbDirectory.Text}\"";
+			string arguments = $"-d \"{_tbDirectory.Text}\"";
 			if (_cbLogin.Checked)
 				arguments += $" -a {_tbAccount.Text} -p {_tbPassword.Text}";
 			Process.Start("NLyric.exe", arguments);

@@ -29,7 +29,7 @@ namespace NLyric.Audio {
 
 			_name = name;
 			_artists = artists.Select(t => t.Trim()).ToArray();
-			Array.Sort(_artists, StringHelper.OrdinalComparer);
+			Array.Sort(_artists, StringComparer.Ordinal);
 		}
 
 		/// <summary>
@@ -43,13 +43,11 @@ namespace NLyric.Audio {
 			if (!HasAlbumInfo(tag))
 				throw new ArgumentException(nameof(tag) + " 中不存在专辑信息");
 
-			string[] artists;
-
 			_name = tag.Album.GetSafeString();
-			artists = tag.AlbumArtists.SelectMany(t => t.GetSafeString().SplitEx()).ToArray();
+			string[] artists = tag.AlbumArtists.SelectMany(t => t.GetSafeString().SplitEx()).ToArray();
 			if (getArtistsFromTrack && artists.Length == 0)
 				artists = tag.Performers.SelectMany(t => t.GetSafeString().SplitEx()).ToArray();
-			Array.Sort(artists, StringHelper.OrdinalComparer);
+			Array.Sort(artists, StringComparer.Ordinal);
 			_artists = artists;
 		}
 

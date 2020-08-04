@@ -9,9 +9,7 @@ namespace System.Cli {
 			if (args is null)
 				throw new ArgumentNullException(nameof(args));
 
-			T result;
-
-			if (!TryParse(args, out result))
+			if (!TryParse(args, out T result))
 				throw new FormatException($"Invalid {nameof(args)} or generic parameter {nameof(T)}");
 			return result;
 		}
@@ -22,26 +20,25 @@ namespace System.Cli {
 				return false;
 			}
 
-			Dictionary<string, ArgumentInfo> argumentInfos;
-
-			if (!TryGetArgumentInfos(typeof(T), out argumentInfos)) {
+			if (!TryGetArgumentInfos(typeof(T), out var argumentInfos)) {
 				result = default;
 				return false;
 			}
+
 			result = new T();
 			for (int i = 0; i < args.Length; i++) {
-				ArgumentInfo argumentInfo;
-
-				if (!argumentInfos.TryGetValue(args[i], out argumentInfo)) {
+				if (!argumentInfos.TryGetValue(args[i], out var argumentInfo)) {
 					// 不是有效参数名
 					result = default;
 					return false;
 				}
+
 				if (argumentInfo.HasSetValue) {
 					// 重复设置参数
 					result = default;
 					return false;
 				}
+
 				if (argumentInfo.IsBoolean) {
 					// 是 bool 类型，所以不需要其它判断，直接赋值 true
 					if (!argumentInfo.TrySetValue(result, true)) {
@@ -51,87 +48,80 @@ namespace System.Cli {
 					argumentInfo.HasSetValue = true;
 					continue;
 				}
+
 				if (i == args.Length - 1) {
 					// 需要提供值但是到末尾了，未提供值
 					result = default;
 					return false;
 				}
+
+				if (!argumentInfo.TrySetValue(result, args[++i])) {
+					result = default;
+					return false;
+				}
+				argumentInfo.HasSetValue = true;
+			}
+
+			foreach (var argumentInfo in argumentInfos.Values) {
+				if (argumentInfo.HasSetValue)
+					continue;
+				// 参数已设置值
+
+				if (argumentInfo.IsRequired) {
+					// 是必选参数
+					result = default;
+					return false;
+				}
 				else {
-					// 提供了值，设置值，并且跳过下一个
-					i++;
-					if (!argumentInfo.TrySetValue(result, args[i])) {
+					// 是可选参数
+					if (!argumentInfo.TrySetValue(result, argumentInfo.DefaultValue)) {
 						result = default;
 						return false;
 					}
-					argumentInfo.HasSetValue = true;
-					continue;
 				}
 			}
-			foreach (ArgumentInfo argumentInfo in argumentInfos.Values)
-				if (!argumentInfo.HasSetValue)
-					// 参数未设置值
-					if (argumentInfo.IsRequired) {
-						// 是必选参数
-						result = default;
-						return false;
-					}
-					else {
-						// 是可选参数
-						if (!argumentInfo.TrySetValue(result, argumentInfo.DefaultValue)) {
-							result = default;
-							return false;
-						}
-					}
 			return true;
 		}
 
 		public static bool ShowUsage<T>() {
-			Type type;
-			PropertyInfo[] propertyInfos;
-			List<ArgumentInfo> argumentInfos;
-			int maxNameLength;
-			StringBuilder sb;
-
-			type = typeof(T);
-			propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+			var type = typeof(T);
+			var propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 			if (propertyInfos.Length == 0)
 				return false;
-			argumentInfos = new List<ArgumentInfo>();
-			foreach (PropertyInfo propertyInfo in propertyInfos) {
-				ArgumentAttribute attribute;
-
-				if (!VerifyProperty(propertyInfo, out attribute))
+			var argumentInfos = new List<ArgumentInfo>();
+			foreach (var propertyInfo in propertyInfos) {
+				if (!VerifyProperty(propertyInfo, out var attribute))
 					return false;
 				if (attribute is null)
 					continue;
 				argumentInfos.Add(new ArgumentInfo(attribute, propertyInfo));
 			}
-			maxNameLength = argumentInfos.Max(t => GetArgumentFormat(t).Length);
-			sb = new StringBuilder();
+
+			int maxNameLength = argumentInfos.Max(t => GetArgumentFormat(t).Length);
+			var sb = new StringBuilder();
 			sb.AppendLine("Options:");
-			foreach (ArgumentInfo argumentInfo in argumentInfos) {
+			foreach (var argumentInfo in argumentInfos) {
 				sb.Append($"  {GetArgumentFormat(argumentInfo).PadRight(maxNameLength)}  {argumentInfo.Description}");
 				if (!argumentInfo.IsRequired)
 					sb.Append("  (Optional)");
 				sb.AppendLine();
 			}
+
 			Console.WriteLine(sb.ToString());
 			return true;
 		}
 
 		private static bool TryGetArgumentInfos(Type type, out Dictionary<string, ArgumentInfo> argumentInfos) {
-			PropertyInfo[] propertyInfos;
-
-			propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+			var propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 			if (propertyInfos.Length == 0) {
 				argumentInfos = null;
 				return false;
 			}
-			argumentInfos = new Dictionary<string, ArgumentInfo>();
-			foreach (PropertyInfo propertyInfo in propertyInfos) {
-				ArgumentAttribute attribute;
 
-				if (!VerifyProperty(propertyInfo, out attribute)) {
+			argumentInfos = new Dictionary<string, ArgumentInfo>();
+			foreach (var propertyInfo in propertyInfos) {
+
+				if (!VerifyProperty(propertyInfo, out var attribute)) {
 					argumentInfos = null;
 					return false;
 				}
@@ -142,18 +132,15 @@ namespace System.Cli {
 		}
 
 		private static bool VerifyProperty(PropertyInfo propertyInfo, out ArgumentAttribute argumentAttribute) {
-			object[] attributes;
-			Type propertyType;
-
 			argumentAttribute = null;
-			attributes = propertyInfo.GetCustomAttributes(typeof(ArgumentAttribute), false);
+			object[] attributes = propertyInfo.GetCustomAttributes(typeof(ArgumentAttribute), false);
 			if (attributes is null || attributes.Length == 0)
 				// 排除未应用 ArgumentAttribute 的属性
 				return true;
 			if (attributes.Length != 1)
 				// ArgumentAttribute 不应该被应用多次
 				return false;
-			propertyType = propertyInfo.PropertyType;
+			var propertyType = propertyInfo.PropertyType;
 			if (propertyType != typeof(string) && propertyType != typeof(bool))
 				// 检查返回类型
 				return false;
@@ -188,9 +175,7 @@ namespace System.Cli {
 		}
 
 		private static string GetArgumentFormat(ArgumentInfo argumentInfo) {
-			return argumentInfo.IsBoolean
-				? argumentInfo.Name
-				: argumentInfo.Name + " " + (string.IsNullOrEmpty(argumentInfo.Type) ? "VALUE" : argumentInfo.Type);
+			return !argumentInfo.IsBoolean ? argumentInfo.Name + " " + (string.IsNullOrEmpty(argumentInfo.Type) ? "VALUE" : argumentInfo.Type) : argumentInfo.Name;
 		}
 
 		private sealed class ArgumentInfo {

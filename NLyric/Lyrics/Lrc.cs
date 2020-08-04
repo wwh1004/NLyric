@@ -16,7 +16,7 @@ namespace NLyric.Lyrics {
 		private string _album;
 		private string _by;
 		private TimeSpan? _offset;
-		private Dictionary<TimeSpan, string> _lyrics = new Dictionary<TimeSpan, string>();
+		private IDictionary<TimeSpan, string> _lyrics = new Dictionary<TimeSpan, string>();
 
 		public string Title {
 			get => _title;
@@ -71,7 +71,7 @@ namespace NLyric.Lyrics {
 			set => _offset = (value is null || value.Value.Ticks == 0) ? null : value;
 		}
 
-		public Dictionary<TimeSpan, string> Lyrics {
+		public IDictionary<TimeSpan, string> Lyrics {
 			get => _lyrics;
 			set {
 				if (value is null)
@@ -85,15 +85,13 @@ namespace NLyric.Lyrics {
 			if (string.IsNullOrEmpty(text))
 				throw new ArgumentNullException(nameof(text));
 
-			Lrc lrc;
-
-			lrc = new Lrc();
-			using (StringReader reader = new StringReader(text)) {
+			var lrc = new Lrc();
+			using (var reader = new StringReader(text)) {
 				string line;
-
-				while (!((line = reader.ReadLine()) is null))
-					if (!TryParseLine(line.Trim(), lrc))
+				while (!((line = reader.ReadLine()?.Trim()) is null) && !string.IsNullOrEmpty(line)) {
+					if (!TryParseLine(line, lrc))
 						throw new FormatException();
+				}
 			}
 			return lrc;
 		}
@@ -102,36 +100,29 @@ namespace NLyric.Lyrics {
 			if (string.IsNullOrEmpty(text))
 				throw new ArgumentNullException(nameof(text));
 
-			Lrc lrc;
-
-			lrc = new Lrc();
-			using (StringReader reader = new StringReader(text)) {
+			var lrc = new Lrc();
+			using (var reader = new StringReader(text)) {
 				string line;
-
-				while (!((line = reader.ReadLine()) is null))
+				while (!((line = reader.ReadLine()?.Trim()) is null))
 					TryParseLine(line.Trim(), lrc);
 			}
 			return lrc;
 		}
 
 		private static bool TryParseLine(string line, Lrc lrc) {
-			int startIndex;
-			int endIndex;
-			List<TimeSpan> times;
-			string lyric;
-
 			if (string.IsNullOrEmpty(line) || line[0] != '[')
 				return false;
-			startIndex = 0;
-			times = new List<TimeSpan>();
-			do {
-				string token;
 
+			int startIndex = 0;
+			int endIndex;
+			var times = new List<TimeSpan>();
+
+			do {
 				endIndex = line.IndexOf(']', startIndex + 1);
 				if (endIndex == -1)
 					// 有"["但是没有"]"
 					return false;
-				token = line.Substring(startIndex + 1, endIndex - startIndex - 1);
+				string token = line.Substring(startIndex + 1, endIndex - startIndex - 1);
 				if (token.StartsWith(TI))
 					lrc.Title = GetMetadata(token, TI);
 				else if (token.StartsWith(AR))
@@ -141,25 +132,19 @@ namespace NLyric.Lyrics {
 				else if (token.StartsWith(BY))
 					lrc.By = GetMetadata(token, BY);
 				else if (token.StartsWith(OFFSET)) {
-					int offset;
-
-					if (!int.TryParse(GetMetadata(token, OFFSET), out offset))
+					if (!int.TryParse(GetMetadata(token, OFFSET), out int offset))
 						return false;
 					lrc.Offset = new TimeSpan(0, 0, 0, 0, offset);
 				}
 				else {
-					TimeSpan time;
-
-					if (!TimeSpan.TryParse("00:" + token, out time))
+					if (!TimeSpan.TryParse("00:" + token, out var time))
 						return false;
 					times.Add(time);
 				}
 			} while ((startIndex = line.IndexOf('[', endIndex + 1)) != -1);
-			if (endIndex + 1 == line.Length)
-				// 没有歌词
-				return true;
-			lyric = line.Substring(endIndex + 1).Trim();
-			foreach (TimeSpan time in times)
+
+			string lyric = line.Substring(endIndex + 1).Trim();
+			foreach (var time in times)
 				lrc._lyrics[time] = lyric;
 			return true;
 
@@ -169,9 +154,7 @@ namespace NLyric.Lyrics {
 		}
 
 		public override string ToString() {
-			StringBuilder sb;
-
-			sb = new StringBuilder();
+			var sb = new StringBuilder();
 			if (!(_title is null))
 				AppendLine(sb, TI, _title);
 			if (!(_artist is null))
@@ -182,7 +165,7 @@ namespace NLyric.Lyrics {
 				AppendLine(sb, BY, _by);
 			if (!(_offset is null))
 				AppendLine(sb, OFFSET, ((long)_offset.Value.TotalMilliseconds).ToString());
-			foreach (KeyValuePair<TimeSpan, string> lyric in _lyrics)
+			foreach (var lyric in _lyrics)
 				sb.AppendLine($"[{TimeSpanToLyricString(lyric.Key)}]{lyric.Value}");
 			return sb.ToString();
 
@@ -191,10 +174,8 @@ namespace NLyric.Lyrics {
 			}
 
 			string TimeSpanToLyricString(TimeSpan _timeSpan) {
-				string milliseconds;
-
-				milliseconds = _timeSpan.Milliseconds.ToString("D3");
-				return _timeSpan.Minutes.ToString("D2") + ":" + _timeSpan.Seconds.ToString("D2") + "." + milliseconds.Substring(0, 2);
+				string milliseconds = _timeSpan.Milliseconds.ToString("D3");
+				return $"{_timeSpan.Minutes:D2}:{_timeSpan.Seconds:D2}.{milliseconds.Substring(0, 2)}";
 			}
 		}
 	}

@@ -29,7 +29,7 @@ namespace NLyric.Audio {
 
 			_name = name;
 			_artists = artists.Select(t => t.Trim()).ToArray();
-			Array.Sort(_artists, StringHelper.OrdinalComparer);
+			Array.Sort(_artists, StringComparer.Ordinal);
 		}
 
 		public Track(Tag tag) {
@@ -38,7 +38,7 @@ namespace NLyric.Audio {
 
 			_name = tag.Title.GetSafeString();
 			_artists = tag.Performers.SelectMany(s => s.GetSafeString().SplitEx()).ToArray();
-			Array.Sort(_artists, StringHelper.OrdinalComparer);
+			Array.Sort(_artists, StringComparer.Ordinal);
 		}
 
 		public override string ToString() {

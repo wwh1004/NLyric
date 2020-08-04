@@ -12,9 +12,7 @@ namespace NLyric {
 		private static readonly Aes _aes = Create163Aes();
 
 		private static Aes Create163Aes() {
-			Aes aes;
-
-			aes = Aes.Create();
+			var aes = Aes.Create();
 			aes.BlockSize = 128;
 			aes.Key = Encoding.UTF8.GetBytes(@"#14ljk_!\]&0U<'(");
 			aes.Mode = CipherMode.ECB;
@@ -32,20 +30,16 @@ namespace NLyric {
 			if (tag is null)
 				throw new ArgumentNullException(nameof(tag));
 
-			string the163Key;
-
 			trackId = 0;
-			the163Key = tag.Comment;
+			string the163Key = tag.Comment;
 			if (!Is163KeyCandidate(the163Key))
 				the163Key = tag.Description;
 			if (!Is163KeyCandidate(the163Key))
 				return false;
 			try {
-				byte[] byt163Key;
-
 				the163Key = the163Key.Substring(22);
-				byt163Key = Convert.FromBase64String(the163Key);
-				using (ICryptoTransform cryptoTransform = _aes.CreateDecryptor())
+				byte[] byt163Key = Convert.FromBase64String(the163Key);
+				using (var cryptoTransform = _aes.CreateDecryptor())
 					byt163Key = cryptoTransform.TransformFinalBlock(byt163Key, 0, byt163Key.Length);
 				trackId = (int)JObject.Parse(Encoding.UTF8.GetString(byt163Key).Substring(6))["musicId"];
 			}

@@ -11,7 +11,7 @@ namespace NLyric.Ncm {
 		}
 
 		public override string ToString() {
-			return base.ToString() + " | Id:" + _id.ToString();
+			return $"{base.ToString()} | Id:{_id}";
 		}
 	}
 }
