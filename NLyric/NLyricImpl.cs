@@ -58,9 +58,10 @@ namespace NLyric {
 			}
 			if (arguments.UseBatch)
 				PrepareAllLyrics(audioInfos);
-			foreach (var audioInfo in audioInfos)
+			foreach (var audioInfo in audioInfos) {
 				if (!(audioInfo.TrackInfo is null))
 					await TryDownloadLyricAsync(audioInfo);
+			}
 			SaveDatabase(databasePath);
 		}
 
@@ -246,7 +247,6 @@ namespace NLyric {
 		private static async Task<bool> TryDownloadLyricAsync(AudioInfo audioInfo) {
 			string lrcPath = Path.ChangeExtension(audioInfo.Path, ".lrc");
 			bool hasLrcFile = File.Exists(lrcPath);
-			string lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllText(lrcPath)) : null;
 			var trackInfo = audioInfo.TrackInfo;
 			NcmLyric ncmLyric;
 			try {
@@ -260,6 +260,7 @@ namespace NLyric {
 			if (hasLrcFile) {
 				// 如果歌词存在，判断是否需要覆盖或更新
 				var lyricInfo = trackInfo.Lyric;
+				string lyricCheckSum = hasLrcFile ? ComputeLyricCheckSum(File.ReadAllBytes(lrcPath)) : null;
 				if (!(lyricInfo is null) && lyricInfo.CheckSum == lyricCheckSum) {
 					// 歌词由NLyric创建
 					if (ncmLyric.RawVersion <= lyricInfo.RawVersion && ncmLyric.TranslatedVersion <= lyricInfo.TranslatedVersion) {
@@ -269,8 +270,9 @@ namespace NLyric {
 					}
 					else {
 						// 不是最新版本
-						if (_lyricSettings.AutoUpdate)
+						if (_lyricSettings.AutoUpdate) {
 							FastConsole.WriteLine("本地歌词不是最新版本，正在更新。", ConsoleColor.Green);
+						}
 						else {
 							FastConsole.WriteLine("本地歌词不是最新版本但是自动更新被禁止，正在跳过。", ConsoleColor.Yellow);
 							return false;
@@ -279,8 +281,9 @@ namespace NLyric {
 				}
 				else {
 					// 歌词非NLyric创建
-					if (_lyricSettings.Overwriting)
+					if (_lyricSettings.Overwriting) {
 						FastConsole.WriteLine("本地歌词非NLyric创建，正在更新。", ConsoleColor.Yellow);
+					}
 					else {
 						FastConsole.WriteLine("本地歌词非NLyric创建但是覆盖被禁止，正在跳过。", ConsoleColor.Yellow);
 						return false;
@@ -298,7 +301,7 @@ namespace NLyric {
 					FastConsole.WriteException(ex);
 					return false;
 				}
-				trackInfo.Lyric = new LyricInfo(ncmLyric, ComputeLyricCheckSum(lyric));
+				trackInfo.Lyric = new LyricInfo(ncmLyric, ComputeLyricCheckSum(_lyricSettings.Encoding.GetBytes(lyric)));
 				FastConsole.WriteLine("本地歌词下载完毕。", ConsoleColor.Magenta);
 			}
 			return true;
@@ -671,8 +674,8 @@ namespace NLyric {
 			return mergedLrc;
 		}
 
-		private static string ComputeLyricCheckSum(string lyric) {
-			return CRC32.Compute(Encoding.Unicode.GetBytes(lyric)).ToString("X8");
+		private static string ComputeLyricCheckSum(byte[] lyric) {
+			return CRC32.Compute(lyric).ToString("X8");
 		}
 		#endregion
 
