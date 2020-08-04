@@ -39,6 +39,23 @@ Windows用户专属GUI。
 
 4. 按照程序提示完成接下来的步骤
 
+命令行参数：
+
+```
+Options:
+  -d DIR         存放音乐的文件夹，可以是相对路径或者绝对路径  (Optional)
+  -a STR         网易云音乐账号（邮箱/手机号）  (Optional)
+  -p STR         网易云音乐密码  (Optional)
+  --update-only  仅更新已有歌词  (Optional)
+  --batch        使用Batch API（实验性）  (Optional)
+```
+
+例子：
+
+```
+NLyric.exe -d C:\Music -a example@example.com -p 123456 --batch
+```
+
 ## 配置
 
 配置文件是"Settings.json"，自己修改即可
@@ -47,7 +64,7 @@ Windows用户专属GUI。
 
 ``` json
 { // 所有匹配都是忽略大小写的！！！
-	"Search": { // 搜索设置，在每一次搜索生效
+	"Search": { // 搜索设置，在每一次搜索生效。
 		"AudioExtensions": [
 			".aac",
 			".ape",
@@ -57,30 +74,26 @@ Windows用户专属GUI。
 			".ogg",
 			".wav",
 			".wma"
-		], // 会被识别为歌曲的扩展名
-		"Separators": "|;,/\\&:", // 分隔符，用于分割歌手名
-		"WholeWordReplace": {
-			"sh0ut": "shØut",
-			"あやぽんず＊": "あやぽんず",
-			"あやぽんず*": "あやぽんず"
-		}, // 前面是被替换的词，后面是要替换成的词，比如歌名"sh0ut"，搜索的时候会被替换成"shØut"来搜索，网易云音乐部分歌曲歌手名收录有问题，只能这么办
-		"Limit": 15 // 搜索结果数量
+		], // 会被识别为歌曲的扩展名。
+		"Separators": "|;,/\\&:", // 分隔符，用于分割歌手名。
+		"WholeWordReplace": {}, // 前面是被替换的词，后面是要替换成的词，比如"A": "B"，那么在搜索"A"的时候会替换为"B"来搜索。
+		"Limit": 15 // 搜索结果数量。
 	},
-	"Fuzzy": { // 第一次搜不到或者匹配失败的情况下，是否进行模糊搜索与匹配
-		"TryIgnoringArtists": true, // 忽略艺术家
-		"TryIgnoringExtraInfo": true, // 忽略 括号/空格 + Cover/feat. 之后的内容，支持的括号类型在Filter.OpenBrackets里
-		"ExtraInfoStart": " ([{【〖", // 空格和左括号等之后的内容会被过滤，注意，不要随便修改这里的内容，可能导致过滤准确性降低
+	"Fuzzy": { // 第一次搜不到或者匹配失败的情况下，是否进行模糊搜索与匹配。
+		"TryIgnoringArtists": true, // 忽略艺术家。
+		"TryIgnoringExtraInfo": true, // 忽略 括号/空格 + Cover/feat. 之后的内容，支持的括号类型在Filter.OpenBrackets里。
+		"ExtraInfoStart": " ([{【〖", // 空格和左括号等之后的内容会被过滤，注意，不要随便修改这里的内容，可能导致过滤准确性降低。
 		"Covers": [
 			"Cover",
 			"カバー"
-		], // Cover的各种写法
+		], // Cover的各种写法。
 		"Featurings": [
 			"feat.",
 			"ft."
-		] // Feat.的各种写法
+		] // Feat.的各种写法。
 	},
-	"Match": { // 匹配设置，在搜索到歌曲信息之后，程序会通过自己的算法再次确认是否匹配
-		"MinimumSimilarity": 0.65, // 匹配时的最小相似度，小于设定值的将不予显示，0~1
+	"Match": { // 匹配设置，在搜索到歌曲信息之后，程序会通过自己的算法再次确认是否匹配。
+		"MinimumSimilarity": 0.65, // 匹配时的最小相似度，小于设定值的将不予显示，0~1。
 		"CharReplace": {
 			"\u00B7": "\u002e",
 			"\u0387": "\u002e",
@@ -108,24 +121,25 @@ Windows用户专属GUI。
 			"\u3011": "\u0029",
 			"\u3017": "\u0029"
 			// )
-		} // 前面是被替换的字符，后面是要替换成的字符，只支持单个字符替换，意思就是一个文字，多个文字会报错
+		} // 前面是被替换的字符，后面是要替换成的字符，只支持单个字符替换，意思就是一个文字，多个文字会报错。
 	},
 	"Lyric": {
 		"Modes": [
 			"Merged",
 			"Raw",
 			"Translated"
-		], // 歌词模式，依次尝试每一个模式直到成功，Merged表示混合未翻译和翻译后歌词，Raw表示未翻译的歌词，Translated表示翻译后的歌词
-		"SimplifyTranslated": true, // 部分翻译后的歌词是繁体的，这个选项可以简体化翻译后的歌词
-		"AutoUpdate": true, // 是否自动更新由NLyric创建的歌词
-		"Overwriting": true // 是否覆盖非NLyric创建的歌词
+		], // 歌词模式，依次尝试每一个模式直到成功，Merged表示混合未翻译和翻译后歌词，Raw表示未翻译的歌词，Translated表示翻译后的歌词。
+		"SimplifyTranslated": true, // 部分翻译后的歌词是繁体的，这个选项可以简体化翻译后的歌词。
+		"Encoding": "utf-8",
+		"AutoUpdate": true, // 是否自动更新由NLyric创建的歌词。
+		"Overwriting": true // 是否覆盖非NLyric创建的歌词。
 	}
 }
 ```
 
 ## 下载
 
-GitHub: [.NET Framework版（Windows请下载这个）](https://github.com/wwh1004/NLyric/releases/latest/download/NLyric-net472.zip) [.NET Core版](https://github.com/wwh1004/NLyric/releases/latest/download/NLyric-netcoreapp2.1.zip)
+GitHub: [.NET Framework版（Windows请下载这个）](https://github.com/wwh1004/NLyric/releases/latest/download/NLyric-net472.zip) [.NET Core版](https://github.com/wwh1004/NLyric/releases/latest/download/NLyric-netcoreapp3.1.zip)
 
 AppVeyor: [![Build status](https://ci.appveyor.com/api/projects/status/vu5vyq11cm38pd7r/branch/master?svg=true)](https://ci.appveyor.com/project/wwh1004/nlyric/branch/master)
 

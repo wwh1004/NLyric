@@ -7,10 +7,11 @@ namespace NLyric {
 		private string _directory;
 		private string _account;
 		private string _password;
+		private bool _updateOnly;
 		private bool _useBatch;
 
 		[Argument("-d", IsRequired = false, DefaultValue = "", Type = "DIR", Description = "存放音乐的文件夹，可以是相对路径或者绝对路径")]
-		public string DirectoryCliSetter {
+		internal string DirectoryCliSetter {
 			set {
 				if (string.IsNullOrEmpty(value))
 					return;
@@ -20,7 +21,7 @@ namespace NLyric {
 		}
 
 		[Argument("-a", IsRequired = false, DefaultValue = "", Type = "STR", Description = "网易云音乐账号（邮箱/手机号）")]
-		public string AccountCliSetter {
+		internal string AccountCliSetter {
 			set {
 				if (string.IsNullOrEmpty(value))
 					return;
@@ -30,7 +31,7 @@ namespace NLyric {
 		}
 
 		[Argument("-p", IsRequired = false, DefaultValue = "", Type = "STR", Description = "网易云音乐密码")]
-		public string PasswordCliSetter {
+		internal string PasswordCliSetter {
 			set {
 				if (string.IsNullOrEmpty(value))
 					return;
@@ -39,8 +40,13 @@ namespace NLyric {
 			}
 		}
 
+		[Argument("--update-only", Description = "仅更新已有歌词")]
+		internal bool UpdateOnlyCliSetter {
+			set => _updateOnly = value;
+		}
+
 		[Argument("--batch", Description = "使用Batch API（实验性）")]
-		public bool UseBatchCliSetter {
+		internal bool UseBatchCliSetter {
 			set => _useBatch = value;
 		}
 
@@ -72,6 +78,11 @@ namespace NLyric {
 
 				_password = value;
 			}
+		}
+
+		public bool UpdateOnly {
+			get => _updateOnly;
+			set => _updateOnly = value;
 		}
 
 		public bool UseBatch {

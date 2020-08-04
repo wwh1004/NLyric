@@ -39,9 +39,11 @@ namespace NLyric {
 			var audioInfoCandidates = audioInfos.Where(t => t.TrackInfo is null).ToArray();
 			await loginTask;
 			// 登录同时进行
-			if (arguments.UseBatch)
-				_ = AccelerateAllTracksAsync(audioInfoCandidates);
-			await LoadAllAudioInfoCandidates(audioInfoCandidates, _ => SaveDatabaseCore(databasePath));
+			if (!arguments.UpdateOnly) {
+				if (arguments.UseBatch)
+					_ = AccelerateAllTracksAsync(audioInfoCandidates);
+				await LoadAllAudioInfoCandidates(audioInfoCandidates, _ => SaveDatabaseCore(databasePath));
+			}
 			audioInfos = audioInfos.Where(t => !(t.TrackInfo is null)).ToArray();
 			if (arguments.UseBatch)
 				_ = AccelerateAllLyricsAsync(audioInfos);
