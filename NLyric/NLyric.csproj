@@ -1,26 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<AssemblyName>NLyric</AssemblyName>
-		<Title>NLyric</Title>
-		<Product>NLyric</Product>
+		<Title>$(ProjectName)</Title>
+		<Version>2.6.0.1</Version>
 		<Copyright>Copyright © 2019-2020 Wwh</Copyright>
-		<AssemblyVersion>2.6.0.1</AssemblyVersion>
-		<FileVersion>2.6.0.1</FileVersion>
+	</PropertyGroup>
+	<PropertyGroup>
+		<TargetFrameworks>netcoreapp3.1;net472</TargetFrameworks>
 		<OutputPath>..\bin\$(Configuration)</OutputPath>
 		<OutputType>Exe</OutputType>
-		<TargetFrameworks>netcoreapp3.1;net472</TargetFrameworks>
-		<RootNamespace>NLyric</RootNamespace>
-		<LangVersion>7.3</LangVersion>
 	</PropertyGroup>
 	<ItemGroup>
-		<EmbeddedResource Include="TraditionalToSimplified.map" />
-	</ItemGroup>
-	<ItemGroup>
-		<PackageReference Include="NeteaseCloudMusicApi" Version="3.22.4" />
+		<PackageReference Include="NeteaseCloudMusicApi" Version="3.25.3" />
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
 		<PackageReference Include="TagLibSharp" Version="2.2.0" />
 	</ItemGroup>
 	<ItemGroup>
+		<EmbeddedResource Include="TraditionalToSimplified.map" />
 		<None Update="Settings.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
