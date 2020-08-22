@@ -16,11 +16,7 @@ namespace NLyric {
 				matrix[0, i] = i;
 			for (int i = 1; i <= x.Length; i++) {
 				for (int j = 1; j <= y.Length; j++) {
-					int cost;
-					if (x[i - 1] == y[j - 1])
-						cost = 0;
-					else
-						cost = 1;
+					int cost = x[i - 1] == y[j - 1] ? 0 : 1;
 					matrix[i, j] = Math.Min(Math.Min(matrix[i - 1, j - 1] + cost, matrix[i, j - 1] + 1), matrix[i - 1, j] + 1);
 				}
 			}
@@ -41,11 +37,7 @@ namespace NLyric {
 				matrix[0, i] = i;
 			for (int i = 1; i <= x.Length; i++) {
 				for (int j = 1; j <= y.Length; j++) {
-					int cost;
-					if (comparison(x[i - 1], y[j - 1]) == 0)
-						cost = 0;
-					else
-						cost = 1;
+					int cost = comparison(x[i - 1], y[j - 1]) == 0 ? 0 : 1;
 					matrix[i, j] = Math.Min(Math.Min(matrix[i - 1, j - 1] + cost, matrix[i, j - 1] + 1), matrix[i - 1, j] + 1);
 				}
 			}
