@@ -4,16 +4,6 @@ namespace NLyric {
 	internal static class CRC32 {
 		private static readonly uint[] _table = GenerateTable(0xEDB88320);
 
-		public static uint Compute(byte[] data) {
-			if (data is null)
-				throw new ArgumentNullException(nameof(data));
-
-			uint crc32 = 0xFFFFFFFF;
-			for (int i = 0; i < data.Length; i++)
-				crc32 = (crc32 >> 8) ^ _table[(crc32 ^ data[i]) & 0xFF];
-			return ~crc32;
-		}
-
 		private static uint[] GenerateTable(uint seed) {
 			uint[] table = new uint[256];
 			for (int i = 0; i < 256; i++) {
@@ -27,6 +17,16 @@ namespace NLyric {
 				table[i] = crc;
 			}
 			return table;
+		}
+
+		public static uint Compute(byte[] data) {
+			if (data is null)
+				throw new ArgumentNullException(nameof(data));
+
+			uint crc32 = 0xFFFFFFFF;
+			for (int i = 0; i < data.Length; i++)
+				crc32 = (crc32 >> 8) ^ _table[(crc32 ^ data[i]) & 0xFF];
+			return ~crc32;
 		}
 	}
 }
