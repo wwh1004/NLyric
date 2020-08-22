@@ -120,7 +120,6 @@ namespace System.Cli {
 
 			argumentInfos = new Dictionary<string, ArgumentInfo>();
 			foreach (var propertyInfo in propertyInfos) {
-
 				if (!VerifyProperty(propertyInfo, out var attribute)) {
 					argumentInfos = null;
 					return false;
@@ -150,12 +149,13 @@ namespace System.Cli {
 				argumentAttribute = null;
 				return false;
 			}
-			foreach (char item in argumentAttribute.Name)
+			foreach (char item in argumentAttribute.Name) {
 				if (!((item >= 'a' && item <= 'z') || (item >= 'A' && item <= 'Z') || (item >= '0' && item <= '9') || item == '-' || item == '_')) {
 					// 检查参数名是否合法
 					argumentAttribute = null;
 					return false;
 				}
+			}
 			if (argumentAttribute.IsRequired && !(argumentAttribute.DefaultValue is null)) {
 				// 是必选参数但有默认值
 				argumentAttribute = null;
