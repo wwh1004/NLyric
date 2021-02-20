@@ -62,7 +62,7 @@ NLyric.exe -d C:\Music -a example@example.com -p 123456 --batch
 
 默认配置：
 
-``` json
+``` javascript
 { // 所有匹配都是忽略大小写的！！！
 	"Search": { // 搜索设置，在每一次搜索生效。
 		"AudioExtensions": [
