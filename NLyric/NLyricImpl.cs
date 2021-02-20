@@ -21,6 +21,7 @@ namespace NLyric {
 		private static readonly FuzzySettings _fuzzySettings = AllSettings.Default.Fuzzy;
 		private static readonly MatchSettings _matchSettings = AllSettings.Default.Match;
 		private static readonly LyricSettings _lyricSettings = AllSettings.Default.Lyric;
+		private static readonly CloudMusic _cloudMusic = new CloudMusic();
 		private static readonly HashSet<string> _failMatchAlbums = new HashSet<string>();
 		// AlbumName
 		private static readonly Dictionary<int, NcmTrack[]> _cachedNcmTrackses = new Dictionary<int, NcmTrack[]>();
@@ -57,7 +58,7 @@ namespace NLyric {
 			}
 			else {
 				FastConsole.WriteLine("登录中...", ConsoleColor.Green);
-				if (await CloudMusic.LoginAsync(arguments.Account, arguments.Password)) {
+				if (await _cloudMusic.LoginAsync(arguments.Account, arguments.Password)) {
 					FastConsole.WriteLine("登录成功！", ConsoleColor.Green);
 				}
 				else {
@@ -245,7 +246,7 @@ namespace NLyric {
 		private static async Task<NcmTrack[]> GetAlbumTracksAsync(AlbumInfo albumInfo) {
 			if (!_cachedNcmTrackses.TryGetValue(albumInfo.Id, out var ncmTracks)) {
 				var list = new List<NcmTrack>();
-				foreach (var item in await CloudMusic.GetTracksAsync(albumInfo.Id)) {
+				foreach (var item in await _cloudMusic.GetTracksAsync(albumInfo.Id)) {
 					if ((await GetLyricAsync(item.Id)).IsCollected)
 						list.Add(item);
 				}
@@ -305,7 +306,7 @@ namespace NLyric {
 		private static async Task<NcmTrack> MapToAsync(Track track, bool withArtists) {
 			var ncmTracks = default(NcmTrack[]);
 			try {
-				ncmTracks = await CloudMusic.SearchTrackAsync(track, _searchSettings.Limit, withArtists);
+				ncmTracks = await _cloudMusic.SearchTrackAsync(track, _searchSettings.Limit, withArtists);
 			}
 			catch (KeywordForbiddenException ex1) {
 				FastConsole.WriteError(ex1.Message);
@@ -333,7 +334,7 @@ namespace NLyric {
 		private static async Task<NcmAlbum> MapToAsync(Album album, bool withArtists) {
 			var ncmAlbums = default(NcmAlbum[]);
 			try {
-				ncmAlbums = await CloudMusic.SearchAlbumAsync(album, _searchSettings.Limit, withArtists);
+				ncmAlbums = await _cloudMusic.SearchAlbumAsync(album, _searchSettings.Limit, withArtists);
 			}
 			catch (KeywordForbiddenException ex1) {
 				FastConsole.WriteError(ex1.Message);
@@ -389,19 +390,18 @@ namespace NLyric {
 		}
 
 		private static void SaveDatabaseCore(string databasePath) {
-			using (var stream = new FileStream(databasePath, FileMode.OpenOrCreate))
-			using (var writer = new StreamWriter(stream))
-				writer.Write(FormatJson(JsonConvert.SerializeObject(_database)));
+			using var stream = new FileStream(databasePath, FileMode.OpenOrCreate);
+			using var writer = new StreamWriter(stream);
+			writer.Write(FormatJson(JsonConvert.SerializeObject(_database)));
 		}
 
 		private static string FormatJson(string json) {
-			using (var writer = new StringWriter())
-			using (var jsonWriter = new JsonTextWriter(writer) { Formatting = Formatting.Indented })
-			using (var reader = new StringReader(json))
-			using (var jsonReader = new JsonTextReader(reader)) {
-				jsonWriter.WriteToken(jsonReader);
-				return writer.ToString();
-			}
+			using var writer = new StringWriter();
+			using var jsonWriter = new JsonTextWriter(writer) { Formatting = Formatting.Indented };
+			using var reader = new StringReader(json);
+			using var jsonReader = new JsonTextReader(reader);
+			jsonWriter.WriteToken(jsonReader);
+			return writer.ToString();
 		}
 		#endregion
 
@@ -498,7 +498,7 @@ namespace NLyric {
 				FastConsole.WriteInfo("已选择：" + result.ToString());
 			return result;
 
-			string TrackOrAlbumToString(ITrackOrAlbum trackOrAlbum) {
+			static string TrackOrAlbumToString(ITrackOrAlbum trackOrAlbum) {
 				if (trackOrAlbum.Artists.Count == 0)
 					return trackOrAlbum.Name;
 				return trackOrAlbum.Name + " by " + string.Join(",", trackOrAlbum.Artists);
@@ -598,7 +598,7 @@ namespace NLyric {
 
 		private static async Task<NcmLyric> GetLyricAsync(int trackId) {
 			if (!_cachedNcmLyrics.TryGetValue(trackId, out var lyric)) {
-				lyric = await CloudMusic.GetLyricAsync(trackId);
+				lyric = await _cloudMusic.GetLyricAsync(trackId);
 				lock (((ICollection)_cachedNcmLyrics).SyncRoot)
 					_cachedNcmLyrics[trackId] = lyric;
 			}
@@ -701,12 +701,12 @@ namespace NLyric {
 		}
 
 		private static async Task AccelerateAllLyricsAsync(AudioInfo[] audioInfos) {
-			const int STEP = 100;
+			const int STEP = 50;
 
 			int[] trackIds = audioInfos.Select(t => t.TrackInfo.Id).ToArray();
 			for (int i = 0; i < trackIds.Length; i += STEP) {
 				var trackIdMap = new Dictionary<string, int>(STEP);
-				var queries = new Dictionary<string, string>(STEP);
+				var queries = new Dictionary<string, object>(STEP);
 				int kMax = i + STEP <= trackIds.Length ? STEP : trackIds.Length % STEP;
 				for (int k = 0; k < kMax; k++) {
 					string route = "/api/song/lyric" + new string('/', k);
@@ -718,7 +718,7 @@ namespace NLyric {
 						["tv"] = -1
 					});
 				}
-				var (isOk, json) = await CloudMusic.Api.RequestAsync(CloudMusicApiProviders.Batch, queries);
+				var (isOk, json) = await _cloudMusic.Api.RequestAsync(CloudMusicApiProviders.Batch, queries);
 				if (!isOk) {
 					FastConsole.WriteError($"[Experimental] 歌词 {i}+{STEP} 加速失败！");
 					continue;
@@ -730,7 +730,7 @@ namespace NLyric {
 							FastConsole.WriteError($"[Experimental] 歌词 {trackId} at {i}+{STEP} 加速失败！");
 							continue;
 						}
-						_cachedNcmLyrics[trackId] = CloudMusic.ParseLyric(trackId, lyricJson);
+						_cachedNcmLyrics[trackId] = _cloudMusic.ParseLyric(trackId, lyricJson);
 					}
 				}
 			}

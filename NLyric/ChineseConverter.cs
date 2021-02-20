@@ -9,14 +9,13 @@ namespace NLyric {
 
 		private static Dictionary<char, char> GetTraditionalToSimplifiedMap() {
 			var assembly = Assembly.GetExecutingAssembly();
-			using (var stream = assembly.GetManifestResourceStream("NLyric.TraditionalToSimplified.map"))
-			using (var reader = new BinaryReader(stream)) {
-				int count = (int)stream.Length / 4;
-				var map = new Dictionary<char, char>(count);
-				for (int i = 0; i < count; i++)
-					map.Add((char)reader.ReadUInt16(), (char)reader.ReadUInt16());
-				return map;
-			}
+			using var stream = assembly.GetManifestResourceStream("NLyric.TraditionalToSimplified.map");
+			using var reader = new BinaryReader(stream);
+			int count = (int)stream.Length / 4;
+			var map = new Dictionary<char, char>(count);
+			for (int i = 0; i < count; i++)
+				map.Add((char)reader.ReadUInt16(), (char)reader.ReadUInt16());
+			return map;
 		}
 
 		public static string TraditionalToSimplified(string s) {

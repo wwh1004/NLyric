@@ -39,8 +39,8 @@ namespace NLyric {
 			try {
 				the163Key = the163Key.Substring(22);
 				byte[] byt163Key = Convert.FromBase64String(the163Key);
-				using (var cryptoTransform = _aes.CreateDecryptor())
-					byt163Key = cryptoTransform.TransformFinalBlock(byt163Key, 0, byt163Key.Length);
+				using var cryptoTransform = _aes.CreateDecryptor();
+				byt163Key = cryptoTransform.TransformFinalBlock(byt163Key, 0, byt163Key.Length);
 				trackId = (int)JObject.Parse(Encoding.UTF8.GetString(byt163Key).Substring(6))["musicId"];
 			}
 			catch {

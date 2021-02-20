@@ -86,12 +86,11 @@ namespace NLyric.Lyrics {
 				throw new ArgumentNullException(nameof(text));
 
 			var lrc = new Lrc();
-			using (var reader = new StringReader(text)) {
-				string line;
-				while (!((line = reader.ReadLine()?.Trim()) is null) && !string.IsNullOrEmpty(line)) {
-					if (!TryParseLine(line, lrc))
-						throw new FormatException();
-				}
+			using var reader = new StringReader(text);
+			string line;
+			while (!((line = reader.ReadLine()?.Trim()) is null) && !string.IsNullOrEmpty(line)) {
+				if (!TryParseLine(line, lrc))
+					throw new FormatException();
 			}
 			return lrc;
 		}
@@ -101,11 +100,10 @@ namespace NLyric.Lyrics {
 				throw new ArgumentNullException(nameof(text));
 
 			var lrc = new Lrc();
-			using (var reader = new StringReader(text)) {
-				string line;
-				while (!((line = reader.ReadLine()?.Trim()) is null))
-					TryParseLine(line.Trim(), lrc);
-			}
+			using var reader = new StringReader(text);
+			string line;
+			while (!((line = reader.ReadLine()?.Trim()) is null))
+				TryParseLine(line.Trim(), lrc);
 			return lrc;
 		}
 

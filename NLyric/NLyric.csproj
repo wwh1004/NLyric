@@ -1,16 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<Title>$(ProjectName)</Title>
-		<Version>2.6.0.1</Version>
-		<Copyright>Copyright © 2019-2020 Wwh</Copyright>
+		<Version>2.6.1.0</Version>
+		<Copyright>Copyright © 2019-2021 Wwh</Copyright>
 	</PropertyGroup>
 	<PropertyGroup>
 		<TargetFrameworks>netcoreapp3.1;net472</TargetFrameworks>
+		<LangVersion>8.0</LangVersion>
 		<OutputPath>..\bin\$(Configuration)</OutputPath>
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="NeteaseCloudMusicApi" Version="3.25.3" />
+		<PackageReference Include="NeteaseCloudMusicApi" Version="3.25.3.9999" />
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
 		<PackageReference Include="TagLibSharp" Version="2.2.0" />
 	</ItemGroup>
